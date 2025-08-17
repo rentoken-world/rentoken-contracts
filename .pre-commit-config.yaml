@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        description: "Removes trailing whitespace"
+      - id: end-of-file-fixer
+        description: "Ensures files end with a newline"
+      - id: check-yaml
+        description: "Checks yaml files for syntax errors"
+      - id: check-added-large-files
+        description: "Prevents giant files from being committed"
+      - id: check-merge-conflict
+        description: "Check for files that contain merge conflict strings"
+      - id: check-case-conflict
+        description: "Check for files that would conflict in case-insensitive filesystems"
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        description: "Lint markdown files"
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        description: "Format markdown files with prettier"
+        types: [markdown]
