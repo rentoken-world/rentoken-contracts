@@ -212,8 +212,7 @@ sequenceDiagram
     participant Oracle as Oracle(房产/租金)
     participant SeriesFactory as SeriesFactory(控制合约)
     participant Investor as 投资人
-    participant RentToken as RentToken(ERC-1404)
-    participant Distribution as ERC-2222(收益分配)
+    participant SeriesToken as SeriesToken(ERC-1404 + ERC-2222)
 
     Note over Landlord,SeriesFactory: 房东抵押未来租金收益
     Landlord->>Oracle: 提交房产NFT与法律文件
@@ -221,17 +220,17 @@ sequenceDiagram
 
     Note over Investor,SeriesFactory: 投资人入场
     Investor->>SeriesFactory: 存入USDC
-    SeriesFactory->>RentToken: mint RentToken
-    SeriesFactory->>Investor: 分配RentToken
+    SeriesFactory->>SeriesToken: mint SeriesToken
+    SeriesFactory->>Investor: 分配SeriesToken
 
     Note over Oracle,SeriesFactory: 租金周期中
     Oracle->>SeriesFactory: 推送租金收益数据
-    SeriesFactory->>Distribution: 将收益注入
-    Distribution->>Investor: 投资人按比例领取收益 (claim)
+    SeriesFactory->>SeriesToken: 将收益注入ERC-2222分配功能
+    SeriesToken->>Investor: 投资人按比例领取收益 (withdrawFunds)
 
     Note over SeriesFactory,Investor: 租金周期结束
-    SeriesFactory-->>RentToken: 停止mint
-    SeriesFactory-->>Distribution: 清算最后收益
-    Distribution-->>Investor: 投资人领取最后一笔分红
+    SeriesFactory-->>SeriesToken: 停止mint
+    SeriesFactory-->>SeriesToken: 清算最后收益
+    SeriesToken-->>Investor: 投资人领取最后一笔分红
     SeriesFactory-->>SeriesFactory: Series关闭
 ```
