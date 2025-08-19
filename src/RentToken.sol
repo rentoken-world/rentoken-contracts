@@ -73,8 +73,8 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
         if (from != address(0) && to != address(0)) {
             require(IKYC(kycOracle).isWhitelisted(from), "RentToken: Sender not KYC verified");
             require(IKYC(kycOracle).isWhitelisted(to), "RentToken: Recipient not KYC verified");
-            require(!ISanction(sanctionOracle).isSanctioned(from), "RentToken: Sender is sanctioned");
-            require(!ISanction(sanctionOracle).isSanctioned(to), "RentToken: Recipient is sanctioned");
+            require(!ISanctionOracle(sanctionOracle).isBlocked(from), "RentToken: Sender is sanctioned");
+            require(!ISanctionOracle(sanctionOracle).isBlocked(to), "RentToken: Recipient is sanctioned");
         }
         _;
     }
@@ -234,7 +234,9 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
      * @dev Override _update to include KYC/sanction checks and reward updates
      */
     function _update(address from, address to, uint256 amount) internal virtual override kycAndSanctionCheck(from, to) updateReward(from) updateReward(to) {
-        require(getPhase() != Phase.Fundraising, "RentToken: Transfers not allowed in fundraising");
+        if (from != address(0)) {
+            require(getPhase() != Phase.Fundraising, "RentToken: Transfers not allowed in fundraising");
+        }
         require(getPhase() != Phase.Terminated, "RentToken: Contract terminated");
 
         super._update(from, to, amount);
@@ -297,5 +299,17 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
      */
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    function setKYCOracle(address _kycOracle) external onlyOwner {
+        kycOracle = _kycOracle;
+    }
+
+    function setSanctionOracle(address _sanctionOracle) external onlyOwner {
+        sanctionOracle = _sanctionOracle;
+    }
+
+    function decimals() public view virtual override returns (uint8) {
+        return 6;
     }
 }

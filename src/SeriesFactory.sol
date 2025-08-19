@@ -191,8 +191,8 @@ contract SeriesFactory is AccessControl, Pausable, ReentrancyGuard {
         address seriesAddress = propertyIdToSeries[propertyId];
         require(seriesAddress != address(0), "SeriesFactory: Series not found");
 
-        // This would require adding setter functions to RentToken
-        // For now, we'll need to implement this in the RentToken contract
+        RentToken(seriesAddress).setKYCOracle(kycOracle);
+        RentToken(seriesAddress).setSanctionOracle(sanctionOracle);
     }
 
     /**

@@ -1,39 +1,52 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+contract MockUSDC {
+    string public name = "Mock USDC";
+    string public symbol = "mUSDC";
+    uint8 public decimals = 6;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
 
-/**
- * @title Mock USDC Contract
- * @dev Mock USDC token for testing purposes
- */
-contract MockUSDC is ERC20, Ownable {
-    uint8 private _decimals = 6; // USDC has 6 decimals
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 
-    constructor() ERC20("Mock USDC", "USDC") Ownable(msg.sender) {}
+    constructor() {
+        _mint(msg.sender, 1000000000000); // 1M USDC with 6 decimals
+    }
 
-    /**
-     * @dev Mint tokens for testing
-     * @param to Address to mint to
-     * @param amount Amount to mint
-     */
-    function mint(address to, uint256 amount) external onlyOwner {
+    function _mint(address to, uint256 amount) internal {
+        totalSupply += amount;
+        balanceOf[to] += amount;
+        emit Transfer(address(0), to, amount);
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        emit Transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        require(allowance[from][msg.sender] >= amount, "Insufficient allowance");
+        require(balanceOf[from] >= amount, "Insufficient balance");
+        allowance[from][msg.sender] -= amount;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        emit Transfer(from, to, amount);
+        return true;
+    }
+
+    function mint(address to, uint256 amount) external {
         _mint(to, amount);
-    }
-
-    /**
-     * @dev Burn tokens
-     * @param amount Amount to burn
-     */
-    function burn(uint256 amount) external {
-        _burn(msg.sender, amount);
-    }
-
-    /**
-     * @dev Override decimals to return 6
-     */
-    function decimals() public view virtual override returns (uint8) {
-        return _decimals;
     }
 }
