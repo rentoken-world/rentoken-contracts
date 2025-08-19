@@ -2,49 +2,48 @@
   目标: |
     建设一个RWA 平台,允许线下的房东和公司将自己的房产未来收益质押到链上,发行erc20 token获得融资。
     每个房产项目对应一个ERC20 Token,房租定期打入合约,持有人可以随时提取利润。
-
   链下:
-    WebUI:
-      - 注意,webui部分是另外一个项目repo去实现,这个项目里不需要,写在这里只是为了context
-      - RenToken.world
-      - 用于展示所有已发行的token
-      - 投资人视角: |
-        投资人联系平台公司进行KYC验证,验证通过后,平台调用链下CLI命令,将该投资人钱包地址写入KYC oracle合约。
-      - 房东视角: |
-        房东联系平台公司,提交房产收益进行质押,涉及法律、合同、估价等,完成后,平台在RentOracle合约里添加这个房产的记录信息。
-        查看自己项目的链上信息
-        系统估值设定最大投资门槛
-        selfservice 可以触发erc20合约的发行,设置最小总融资门槛(意味着低于此门槛,不发行)
-        运行中项目的状态,收益情况,可以提取收益到自己的钱包
+    WebUI: 有另一个repo去负责，这里忽略。
     链下的管理脚本:
       描述: |
         提供基于cast命令的CLI脚本,可由admin身份与链上合约交互。后续版本考虑把管理页面做到网页里,当前mvp不做。
       操作:
         - 部署SeriesFactory合约的脚本: 平台控制合约,提供路由和入口。
-        - 部署propertyOracle合约的脚本: oracle合约，提供房产信息查询。
-        - 添加/更新propertyOracle记录的脚本:
+        - 部署PropertyOracle合约的脚本: oracle合约，提供房产信息查询。
+        - 添加/更新PropertyOracle记录的脚本:
         - 管理erc20 rent token的脚本:
           - 从seriesfactory合约发行脚本
           - 向erc20合约转每月月租账目,分配收益的脚本
   链上:
-    平台包含一个SeriesFactory合约,一个NFT合约,多个NFT Token,以及多个RTN Series合约。
+    平台包含一个SeriesFactory合约、一个PropertyOracle合约，以及多个RTN Series合约。
     SeriesFactory合约:
       功能:
-        - 记录NFT合约地址,统计NFT token数量(从1开始的顺序整数)。
+        - 记录PropertyOracle合约地址。
         - 发行RTN 代币合约
           - ERC20合约
           - 具备分红池功能和
           - 交易设定KYC,sanction验证
-        - mint NFT token时需传入:
-          token Id、最小认购额度(usdc, minRaising)、最大认购额度(usdc)。
-        - 部署RTN 代币合约,每个合约必须基于一个NFT Token。
+        - 租金入金与费用路径:
+          - 租客将租金打入平台银行账户；平台按线下协议扣除管理费与相关费用后，将净利润兑换为 USDC
+          - 平台调用 SeriesFactory 的入金方法；SeriesFactory 作为唯一入口，转调对应 RT*** 合约的 receiveProfit
+          - 仅允许有权限的 operator/admin 调用；链上不再扣平台费（净额入账）
+        - 部署RTN 代币合约,每个合约必须基于一个PropertyOracle中的propertyId。
         - 记录已发行的RTN 代币合约
         - 发行RTN 代币合约时需指定:
-          - nftId
-          - minFundRaiseAmount: (最小认购额度 usdc)
-          - maxFundRaiseAmount: (最大认购额度(usdc)
+          - propertyId
+        - 部署行为: 部署时从 PropertyOracle 读取 minRaising/maxRaising 等关键参数，并将其快照固化到系列合约
       - 合约状态变量:
-        - propertyOracle:  nft721 合约,对每个房产发nft token,我们把他当作是个oracle来用
+        - propertyOracle:  PropertyOracle 合约,作为只读存储，披露房产信息
+        - propertyIdToSeries: propertyId => series 合约地址映射
+        - operator/admin 角色: 用于 receiveProfit 等受限操作
+      - 方法:
+        - receiveProfit:
+          - 参数: propertyId, amount
+          - 权限: 仅 operator/admin
+          - 路由: 基于 propertyId 定位 series 合约；若不存在映射则拒绝
+          - 资金: 使用 payoutToken.safeTransferFrom(msg.sender, series, amount) 转入净额
+          - 调用: 随后调用 series.receiveProfit(amount)
+          - 事件: 触发 ProfitForwarded(propertyId, series, amount, msg.sender)
       - 关于发行erc20合约的逻辑:
         需要采用代理合约，也就是每一个erc20合约都是保存数据，然后借用一个implementation合约实现逻辑。
     RT*** 代币合约:
@@ -58,8 +57,10 @@
         - symbol例子: RTAMS1, RTSHBND
       - 合约状态变量:
         - accumulatedRewardPerToken: 代表截止目前,每一枚token可以分到的累积收益,用USDC/RTN作为单位
-        - propertyOracle: 房产nft token的合约,我们把他当作是个oracle来用
-        - nftId: 对应的nft tokenid
+        - propertyOracle: PropertyOracle 合约，披露房产信息
+        - propertyId: 对应的PropertyOracle的propertyId
+        - minRaising: 募集下限(部署时从PropertyOracle快照)
+        - maxRaising: 募集上限(部署时从PropertyOracle快照)
         - totalFundRaised: 发售期间累计收到的usdc投资总额,用于统计总融资金额
         - totalProfitReceived: 租金usdc累加器, 跟踪接收到的总租金额度
         - seriesFactory合约地址: 用于做权限检查
@@ -69,7 +70,7 @@
       - 合约方法(注意：不一定全,可以添加):
         - getPhase:
           - 合约自动判断当前状态。
-          - 根据自己的nft721合约,获取开始和解释的日期,自动判断。
+          - 根据PropertyOracle获取起息和止息的日期,自动判断。
           - 合约状态:
             - fundrising: 认购阶段,只能mint RenToken
             - accrualStarted: 发售成功运行中,定期接收分红,用户按照算法去提取分红,用户可以在kyc的限制下交易token
@@ -83,16 +84,26 @@
           - 如果操作会更改用户的amount,那么要提取所有未分配利润进入claimable,然后再根据当前的acc更新amount和debt
           - 除了只读操作外,操作要对收发方都做kyc和sanction验证,考虑用一个modifier去做。
         - 合约状态对操作的一些影响:
-          - fundrising阶段,不允许接收usdc利润,只接收投资资金
+          - fundrising阶段,不允许接收usdc利润,只接收投资资金; 仅允许按照 1 USDC = 1 RTN 铸币; 禁止 transfer/approve/burn; 因此每个地址的 amount 恰好等于其累计贡献的 USDC 金额, 用作失败退款的基准
           - mint只允许在fundrising阶段进行
+          - 当 totalFundRaised 达到 maxRaising 时，停止接受新的投资（contribute 将直接拒绝）
           - running阶段,不允许接收投资资金,也不允许再mint,可以接收利润分配操作
           - finish阶段,不允许再接收利润分配,只可以claim
           - terminated 阶段,用户不允许再做任何操作,只有admin可以提取合约里剩余的usdc到自己钱包里
         - receiveProfit:
           - 接收房租利润方法,检查发送方,只接收来自SeriesFactory的钱
           - 更新accumulatedRewardPerToken
+        - contribute:
+          - 募集期投资入口，按 1 USDC = 1 RTN 定价，收到 USDC 后立刻为投资人铸造同等数量的 RTN
+          - 募集期内禁止 RTN 的 transfer/approve/burn，保证 amount 与累计 USDC 贡献额一致
+          - 若本次出资导致 totalFundRaised + amount > maxRaising，则交易直接拒绝（revert）
+          - 价格与小数精度: RTN 的 decimals 与 payoutToken 保持一致，确保 1:1 精确铸币；不足最小精度的金额将被拒绝
+          - 最小投资额: 至少 1 个最小精度单位（如 USDC 的 1e-6），可配置更高的 minContribution
+          - 单位倍数: amount 必须是最小精度单位的整数倍；若配置了 lotSize，则 amount 必须是 lotSize 的整数倍
+          - 超额部分: 一律拒绝本次交易（不接收并不找零）
         - refund:
-          退款,检查msg.sender的名下有多少amount 的usdc,大于0的话退回给他,然后把amount设置为0,使用transfer？要不要把
+          - 仅在 risingFailed 阶段可调用；按用户当前 amount 作为 USDC 退款基准退款，并将其 amount 减少相同数量（或销毁对应 RTN）
+          - 退款后更新 totalFundRaised、用户 debt/claimable 等相关会计参数，避免遗留分红状态
       - 计算利益分配的原理: |
         在传统的erc20 之上,每个用户信息里有三个信息,amount,debt,claimable。
         amount是用户当前持有代币的数量。
@@ -103,11 +114,11 @@
         这个参数是每次有房租收益通过SeriesFactory合约转入RT*** 合约的时候更新,公式是 acc_new = acc_old + profix/totalTokenAmountAtThisMoment
         它代表了累积的收益在每一个代币上的体现。
       - 关于risingfailed状态下退款的说明: |
-        risingfailed状态是当accrualStartDatetime过了以后,totalProfitReceived < minFundRaiseAmount,说明筹集来的资金没有满足最小发售门槛。
-        这个门槛是房东设立的最低门槛,进入退款环节。在这个环节里,每个用户可以呼叫refund 方法
+        risingfailed状态是当accrualStartDatetime过了以后,totalFundRaised < minRaising,说明筹集来的资金没有满足最小发售门槛。
+        这个门槛是由PropertyOracle设定并在部署时快照,进入退款环节。在这个环节里,每个用户可以呼叫refund 方法
 
-    propertyOracle合约:
-      功能: 充当房产链上Oracle,披露所有与房产相关的信息。之前想要做nft，现在发现不需要
+    PropertyOracle合约:
+      功能: 充当房产链上Oracle,披露所有与房产相关的信息。
       接口: |
       struct PropertyData {
       uint256 propertyId;        // 资产ID
@@ -117,7 +128,7 @@
       uint256 maxRaising;        // 最大募集额(USDC)
       uint64  accrualStart;      // 起息(Unix time)
       uint64  accrualEnd;        // 止息(Unix time)
-      uint16  feeBps;            // 平台费,基点
+      uint16  feeBps;            // 平台费,基点（本版净额已在链下扣除，可设 0 或忽略）
       address landlord;          // 房东/收益权所有者
       bytes32 docHash;           // 线下材料的内容哈希(如 IPFS 文件的 keccak256)
       string  city;              // 城市(可选,字符串要谨慎,Gas 贵)
