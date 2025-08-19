@@ -1,64 +1,66 @@
-# RenToken Contracts
+## Foundry
 
-Smart contracts for the RenToken project.
+**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
-## Development Setup
+Foundry consists of:
 
-### Prerequisites
+- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
+- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
+- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
+- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
 
-- Python 3.7+ (for pre-commit)
-- pip (Python package manager)
+## Documentation
 
-### Installation
+https://book.getfoundry.sh/
 
-1. Install pre-commit:
+## Usage
 
-```bash
-pip install pre-commit
-# or on macOS with Homebrew:
-# brew install pre-commit
+### Build
+
+```shell
+$ forge build
 ```
 
-1. Install the pre-commit hooks:
+### Test
 
-```bash
-pre-commit install
+```shell
+$ forge test
 ```
 
-1. (Optional) Run pre-commit on all files:
+### Format
 
-```bash
-pre-commit run --all-files
+```shell
+$ forge fmt
 ```
 
-## Pre-commit Hooks
+### Gas Snapshots
 
-The following checks run automatically before each commit:
-
-- **Trailing whitespace removal** - Removes trailing whitespace from files
-- **End-of-file fixer** - Ensures files end with a newline
-- **YAML validation** - Checks YAML files for syntax errors
-- **Large file check** - Prevents giant files from being committed
-- **Merge conflict check** - Ensures no merge conflict markers remain
-- **Case conflict check** - Prevents case-sensitivity issues
-- **Markdown linting** - Lints and fixes Markdown files
-- **Prettier formatting** - Formats Markdown files consistently
-
-## Manual Formatting
-
-To manually format files:
-
-```bash
-# Format all markdown files
-pre-commit run prettier --all-files
-
-# Lint all markdown files
-pre-commit run markdownlint --all-files
-
-# Remove trailing whitespace from all files
-pre-commit run trailing-whitespace --all-files
+```shell
+$ forge snapshot
 ```
 
-## License
+### Anvil
 
-MIT License - see [LICENSE](LICENSE) file for details.
+```shell
+$ anvil
+```
+
+### Deploy
+
+```shell
+$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+```
+
+### Cast
+
+```shell
+$ cast <subcommand>
+```
+
+### Help
+
+```shell
+$ forge --help
+$ anvil --help
+$ cast --help
+```
