@@ -1,0 +1,113 @@
+
+# .cursorrules
+# 目标：本文件定义本仓库的工程规范，供 Cursor 生成/重构代码时遵循。
+# 受众：AI 助手 + 新加入的贡献者。
+
+## 0. 基本立场
+- 本项目 **只使用 Foundry**（forge/cast/anvil），**不用 Hardhat、Truffle**。
+- 语言：Solidity。默认使用 **0.8.24** 版本，除非另有说明。
+- SPDX 许可证：**MIT**（如需变更，请在 LICENSE 与每个合约头部同步更新）。
+
+## 1. 目录结构
+- `script/` 部署与运维脚本（forge script）。
+- `test/` 测试（forge-std + fuzz + invariant）。
+- `src/` 合约代码
+- `lib/` 外部依赖（通过 `forge install`）。
+- `broadcast/` 部署产物（forge script 自动生成）。
+- `.env` / `.env.example` 管理私钥与 RPC（脚本中用 `vm.env*` 读取）。
+
+## 2. 编译与版本
+- 统一 `pragma solidity ^0.8.24;`
+- 每个文件顶部包含：
+  - `// SPDX-License-Identifier: MIT`
+  - `pragma solidity ^0.8.24;`
+- 不允许使用低版本编译器指令覆盖。
+
+## 3. 命名规范
+- 合约/库：**大驼峰**，如 `MyToken`, `StakingPool`。
+- 接口：前缀 `I`，如 `IMyToken`。
+- 函数/变量：**小驼峰**，如 `transferToken`, `maxSupply`。
+- 常量：**全大写+下划线**，如 `MAX_SUPPLY`。
+- 事件：**大驼峰**，如 `TokensStaked`。
+- 文件名：与主合约同名。如 `MyToken.sol`。
+
+## 4. 代码风格
+- 优先使用 **`forge fmt`** 自动格式化（提交前必须通过）。
+- 使用 **NatSpec** 注释公开/外部函数与合约：
+  - `@title @notice @dev @param @return`
+- 事件在状态改变的关键路径发出，字段顺序：`(actor, subject, value, data...)`。
+- 使用 **自定义错误** 代替 `require(...,"string")`，减少 gas。
+- `immutable`、`constant` 合理使用，节省存储。
+- 函数可见性显式标注：`external/public/internal/private`。
+- 访问控制统一：`Ownable` 或 `AccessControl`，禁止随意混用。
+- 重入保护：使用 `nonReentrant` 或检查-效应-交互模式。
+- 钱包转账：优先使用 `call{value: ...}("")`，检查返回值。
+- 升级性：**默认不可升级**。若需可升级，采用 OpenZeppelin UUPS/Transparent 并在文档中说明存储布局策略与测试。
+
+## 5. 安全基线（AI 生成必须遵守）
+- 严禁 `tx.origin` 鉴权。
+- 外部调用必须处理返回值；对不可信合约使用接口并假设恶意行为。
+- 校验输入边界（零地址、上下限、长度等）。
+- 保护关键参数：初始化一次、使用 `immutable` 或构造函数赋值。
+- 随机性：不得使用 `block.timestamp` 作为随机源（除非非安全用途且明确说明）。
+- 价格/预言机：读取时要考虑延迟、心跳、阈值；必要时加速失败（circuit breaker）。
+- 代币交互：兼容非标准 ERC20（返回值可能为 `false` 或无返回），优先用 SafeERC20。
+
+## 6. Gas 指南
+- 循环避免对动态数组的无界遍历；必要时分页或映射。
+- 事件字段尽量 `indexed`（<=3 个）。
+- 使用 `unchecked` 包裹确定无溢出的加减法。
+- 存储读写前先缓存到内存变量。
+- 映射嵌套优先于数组搜索。
+
+## 7. 测试规范（Foundry）
+- 框架：`forge-std`（`vm`, `stdError`, `StdCheats`）。
+- 覆盖率目标：**语句覆盖 ≥ 90%**（关键路径 100%）。
+- 必含三类用例：
+  1) 单元测试（deterministic）
+  2) 模糊测试（`forge test --fuzz-runs`）
+  3) 不变量测试（`invariant` 套件，若涉及资产安全/AMM/金库）
+- 断言：`assertEq/approxEqAbs/expectRevert/expectEmit`。
+- 命名：`ContractName.t.sol`，测试合约 `ContractNameTest`。
+- 快照 & 分叉测试：对接主网/测试网 RPC，标注所依赖区块高度。
+
+## 8. 部署与脚本
+- 部署只使用 `forge script` + `--broadcast`，禁用自写私钥处理逻辑。
+- 链 ID、RPC、私钥全部来源于 `.env`，示例放在 `.env.example`。
+- `script/Deploy.s.sol` 输出关键地址与校验信息（事件/日志）。
+- 变更部署流程必须在 PR 中描述迁移影响（含存储布局/参数）。
+
+## 9. 静态分析与规范检查
+- Lint：`solhint` +（可选）`prettier-plugin-solidity`（以 `forge fmt` 为准）。
+- 安全扫描：建议集成 **Slither**；若告警被忽略，必须在 PR 说明原因。
+- CI（建议）：`forge fmt --check`、`forge build`、`forge test -vvv`、`slither .`。
+
+## 10. 提交与分支
+- 提交消息使用 **Conventional Commits**：
+  - `feat: ...` `fix: ...` `refactor: ...` `test: ...` `chore: ...` `docs: ...`
+- 分支策略：`main` 受保护，功能分支 `feat/*`、修复分支 `fix/*`。
+- PR 要求：描述动机、主要变更、风险与回滚方式，附测试截图或日志。
+
+## 11. 依赖与库
+- 优先使用 OpenZeppelin 合约。新增库需注明版本与审计状态。
+- 通过 `forge install owner/repo` 管理，固定 commit 哈希或 tag。
+- 禁止从不可信来源复制粘贴未审计代码。
+
+## 12. 文档与示例
+- 每个公开合约需有 `@title @notice`，关键函数给出使用示例。
+- 对外接口（`interface/`）与错误（`errors/`）集中管理，便于复用。
+
+## 13. AI 生成专属提示（Cursor）
+- 请严格遵守本文件；如有冲突，以本文件为准。
+- 生成代码时：
+  - 添加 SPDX 与 pragma。
+  - 补全 NatSpec、事件、自定义错误与输入校验。
+  - 附带最小可用测试（含一个 fuzz 用例）。
+  - 若使用外部依赖，请给出 `forge install` 命令与 `foundry.toml` 片段。
+- 遇到不确定的业务规则：**提出最小化假设并在注释中标注**。
+
+## 14. 违禁清单
+- 使用 Hardhat/Truffle 配置或脚本。
+- 使用 `require(..., "long string")` 取代自定义错误。
+- 省略可见性、忽略返回值、使用 `tx.origin` 鉴权。
+- 将私钥硬编码到脚本或合约。

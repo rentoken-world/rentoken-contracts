@@ -20,11 +20,12 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
 
     // Contract phases
     enum Phase {
-        Fundraising,      // 认购阶段
-        AccrualStarted,   // 发售成功运行中
-        RisingFailed,     // 筹款失败
-        AccrualFinished,  // 合约到期
-        Terminated        // 合约终止
+        Fundraising, // 认购阶段
+        AccrualStarted, // 发售成功运行中
+        RisingFailed, // 筹款失败
+        AccrualFinished, // 合约到期
+        Terminated // 合约终止
+
     }
 
     // Property information
@@ -73,8 +74,8 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
         if (from != address(0) && to != address(0)) {
             require(IKYC(kycOracle).isWhitelisted(from), "RentToken: Sender not KYC verified");
             require(IKYC(kycOracle).isWhitelisted(to), "RentToken: Recipient not KYC verified");
-            require(!ISanctionOracle(sanctionOracle).isBlocked(from), "RentToken: Sender is sanctioned");
-            require(!ISanctionOracle(sanctionOracle).isBlocked(to), "RentToken: Recipient is sanctioned");
+            require(!ISanctionOracle(sanctionOracle).isSanctioned(from), "RentToken: Sender is sanctioned");
+            require(!ISanctionOracle(sanctionOracle).isSanctioned(to), "RentToken: Recipient is sanctioned");
         }
         _;
     }
@@ -233,7 +234,14 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
     /**
      * @dev Override _update to include KYC/sanction checks and reward updates
      */
-    function _update(address from, address to, uint256 amount) internal virtual override kycAndSanctionCheck(from, to) updateReward(from) updateReward(to) {
+    function _update(address from, address to, uint256 amount)
+        internal
+        virtual
+        override
+        kycAndSanctionCheck(from, to)
+        updateReward(from)
+        updateReward(to)
+    {
         if (from != address(0)) {
             require(getPhase() != Phase.Fundraising, "RentToken: Transfers not allowed in fundraising");
         }
@@ -245,7 +253,13 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
     /**
      * @dev Override approve to include KYC/sanction checks
      */
-    function approve(address spender, uint256 amount) public virtual override kycAndSanctionCheck(msg.sender, spender) returns (bool) {
+    function approve(address spender, uint256 amount)
+        public
+        virtual
+        override
+        kycAndSanctionCheck(msg.sender, spender)
+        returns (bool)
+    {
         require(getPhase() != Phase.Fundraising, "RentToken: Approvals not allowed in fundraising");
         require(getPhase() != Phase.Terminated, "RentToken: Contract terminated");
 
@@ -255,7 +269,15 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
     /**
      * @dev Override transferFrom to include KYC/sanction checks and reward updates
      */
-    function transferFrom(address from, address to, uint256 amount) public virtual override kycAndSanctionCheck(from, to) updateReward(from) updateReward(to) returns (bool) {
+    function transferFrom(address from, address to, uint256 amount)
+        public
+        virtual
+        override
+        kycAndSanctionCheck(from, to)
+        updateReward(from)
+        updateReward(to)
+        returns (bool)
+    {
         require(getPhase() != Phase.Fundraising, "RentToken: Transfers not allowed in fundraising");
         require(getPhase() != Phase.Terminated, "RentToken: Contract terminated");
 
