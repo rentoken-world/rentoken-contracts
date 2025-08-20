@@ -61,16 +61,16 @@ contract SeriesFactory is AccessControl, Pausable, ReentrancyGuard {
      * @param name Token name (e.g., "RenToken Amsterdam 001")
      * @param symbol Token symbol (e.g., "RTAMS1")
      */
-    function createSeries(
-        uint256 propertyId,
-        string memory name,
-        string memory symbol
-    ) external onlyAdmin returns (address) {
+    function createSeries(uint256 propertyId, string memory name, string memory symbol)
+        external
+        onlyAdmin
+        returns (address)
+    {
         require(propertyIdToSeries[propertyId] == address(0), "SeriesFactory: Series already exists");
         require(rentTokenImplementation != address(0), "SeriesFactory: Implementation not set");
 
         // Get property data from oracle
-        (PropertyOracle.PropertyData memory propertyData, ) = PropertyOracle(propertyOracle).getProperty(propertyId);
+        (PropertyOracle.PropertyData memory propertyData,) = PropertyOracle(propertyOracle).getProperty(propertyId);
         require(propertyData.propertyId != 0, "SeriesFactory: Property not found");
 
         // Clone the implementation
@@ -90,7 +90,7 @@ contract SeriesFactory is AccessControl, Pausable, ReentrancyGuard {
             address(this),
             propertyOracle,
             address(0), // KYC Oracle - to be set later
-            address(0)  // Sanction Oracle - to be set later
+            address(0) // Sanction Oracle - to be set later
         );
 
         // Record the series
@@ -107,12 +107,7 @@ contract SeriesFactory is AccessControl, Pausable, ReentrancyGuard {
      * @param propertyId The property ID
      * @param amount The profit amount in USDC
      */
-    function receiveProfit(uint256 propertyId, uint256 amount)
-        external
-        onlyOperator
-        nonReentrant
-        whenNotPaused
-    {
+    function receiveProfit(uint256 propertyId, uint256 amount) external onlyOperator nonReentrant whenNotPaused {
         require(amount > 0, "SeriesFactory: Amount must be positive");
 
         address seriesAddress = propertyIdToSeries[propertyId];
@@ -133,7 +128,7 @@ contract SeriesFactory is AccessControl, Pausable, ReentrancyGuard {
      * @return The payout token address
      */
     function getPayoutToken(uint256 propertyId) public view returns (address) {
-        (PropertyOracle.PropertyData memory propertyData, ) = PropertyOracle(propertyOracle).getProperty(propertyId);
+        (PropertyOracle.PropertyData memory propertyData,) = PropertyOracle(propertyOracle).getProperty(propertyId);
         return propertyData.payoutToken;
     }
 
@@ -183,11 +178,7 @@ contract SeriesFactory is AccessControl, Pausable, ReentrancyGuard {
      * @param kycOracle The KYC oracle address
      * @param sanctionOracle The sanction oracle address
      */
-    function setOraclesForSeries(
-        uint256 propertyId,
-        address kycOracle,
-        address sanctionOracle
-    ) external onlyAdmin {
+    function setOraclesForSeries(uint256 propertyId, address kycOracle, address sanctionOracle) external onlyAdmin {
         address seriesAddress = propertyIdToSeries[propertyId];
         require(seriesAddress != address(0), "SeriesFactory: Series not found");
 
@@ -231,11 +222,7 @@ contract SeriesFactory is AccessControl, Pausable, ReentrancyGuard {
      * @param to The recipient address
      * @param amount The amount to recover
      */
-    function emergencyRecoverToken(
-        address token,
-        address to,
-        uint256 amount
-    ) external onlyAdmin {
+    function emergencyRecoverToken(address token, address to, uint256 amount) external onlyAdmin {
         require(to != address(0), "SeriesFactory: Invalid recipient");
         IERC20(token).safeTransfer(to, amount);
     }
