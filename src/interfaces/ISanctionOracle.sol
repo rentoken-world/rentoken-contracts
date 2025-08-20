@@ -6,5 +6,5 @@ pragma solidity ^0.8.20;
  * @dev Interface for sanction verification
  */
 interface ISanctionOracle {
-    function isBlocked(address addr) external view returns (bool);
+    function isSanctioned(address addr) external view returns (bool);
 }
