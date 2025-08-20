@@ -5,6 +5,37 @@
 
 set -e  # 出错时退出
 export FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+
+# 生成5个测试账户
+echo "Generating 5 test accounts from Anvil default mnemonic..."
+MNEMONIC="test test test test test test test test test test test junk"
+
+for i in {0..4}; do
+    PRIVATE_KEY=$(cast wallet derive-private-key --mnemonic "$MNEMONIC" --mnemonic-index $i 2>/dev/null)
+    ADDRESS=$(cast wallet address --private-key $PRIVATE_KEY 2>/dev/null)
+    export ACCOUNT_${i}_ADDRESS=$ADDRESS
+    export ACCOUNT_${i}_PRIVATE_KEY=$PRIVATE_KEY
+done
+
+# 设置常用别名
+export ADMIN_ADDRESS=$ACCOUNT_0_ADDRESS
+export ADMIN_PRIVATE_KEY=$ACCOUNT_0_PRIVATE_KEY
+export USER1_ADDRESS=$ACCOUNT_1_ADDRESS
+export USER1_PRIVATE_KEY=$ACCOUNT_1_PRIVATE_KEY
+export USER2_ADDRESS=$ACCOUNT_2_ADDRESS
+export USER2_PRIVATE_KEY=$ACCOUNT_2_PRIVATE_KEY
+export USER3_ADDRESS=$ACCOUNT_3_ADDRESS
+export USER3_PRIVATE_KEY=$ACCOUNT_3_PRIVATE_KEY
+export USER4_ADDRESS=$ACCOUNT_4_ADDRESS
+export USER4_PRIVATE_KEY=$ACCOUNT_4_PRIVATE_KEY
+
+echo "Test accounts generated:"
+echo "ADMIN: $ADMIN_ADDRESS"
+echo "USER1: $USER1_ADDRESS"
+echo "USER2: $USER2_ADDRESS"
+echo "USER3: $USER3_ADDRESS"
+echo "USER4: $USER4_ADDRESS"
+
 RPC_URL="http://localhost:8545"
 # Anvil 默认私钥，用于账户 0（带有 ETH 余额）
 PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -14,17 +45,17 @@ echo "Deploying contracts to local Anvil..."
 # 注意: 此脚本假设 Anvil 以主网 fork 模式运行 (anvil --fork-url <mainnet_rpc>)，以使用真实的 USDC 和 Sanction Oracle 合约。
 
 # 部署 KYCOracle
-KYC_ORACLE_ADDR=$(forge create --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY src/KYCOracle.sol:KYCOracle | grep "Deployed to:" | awk '{print $3}')
+KYC_ORACLE_ADDR=$(forge create --broadcast --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY src/KYCOracle.sol:KYCOracle | grep "Deployed to:" | awk '{print $3}')
 echo "Deployed KYCOracle at $KYC_ORACLE_ADDR"
 [ -n "$KYC_ORACLE_ADDR" ] || { echo "Error: Failed to deploy KYCOracle"; exit 1; }
 
 # 部署 PropertyOracle
-PROPERTY_ORACLE_ADDR=$(forge create --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY src/PropertyOracle.sol:PropertyOracle | grep "Deployed to:" | awk '{print $3}')
+PROPERTY_ORACLE_ADDR=$(forge create --broadcast --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY src/PropertyOracle.sol:PropertyOracle | grep "Deployed to:" | awk '{print $3}')
 echo "Deployed PropertyOracle at $PROPERTY_ORACLE_ADDR"
 [ -n "$PROPERTY_ORACLE_ADDR" ] || { echo "Error: Failed to deploy PropertyOracle"; exit 1; }
 
 # 部署 RentToken 实现
-RENT_TOKEN_IMPL_ADDR=$(forge create --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY src/RentToken.sol:RentToken | grep "Deployed to:" | awk '{print $3}')
+RENT_TOKEN_IMPL_ADDR=$(forge create --broadcast --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY src/RentToken.sol:RentToken | grep "Deployed to:" | awk '{print $3}')
 echo "Deployed RentToken implementation at $RENT_TOKEN_IMPL_ADDR"
 [ -n "$RENT_TOKEN_IMPL_ADDR" ] || { echo "Error: Failed to deploy RentToken implementation"; exit 1; }
 
@@ -35,12 +66,12 @@ SANCTION_ORACLE_ADDR=0x40C57923924B5c5c5455c48D93317139ADDaC8fb
 echo "Using real Sanction Oracle at $SANCTION_ORACLE_ADDR"
 
 # 使用 PropertyOracle 部署 SeriesFactory
-SERIES_FACTORY_ADDR=$(forge create --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY src/SeriesFactory.sol:SeriesFactory --constructor-args $PROPERTY_ORACLE_ADDR | grep "Deployed to:" | awk '{print $3}')
+SERIES_FACTORY_ADDR=$(forge create --broadcast --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY src/SeriesFactory.sol:SeriesFactory --constructor-args $PROPERTY_ORACLE_ADDR | grep "Deployed to:" | awk '{print $3}')
 echo "Deployed SeriesFactory at $SERIES_FACTORY_ADDR"
 [ -n "$SERIES_FACTORY_ADDR" ] || { echo "Error: Failed to deploy SeriesFactory"; exit 1; }
 
 # 在 SeriesFactory 中设置 RentToken 实现（部署者具有管理员角色）
-cast send --rpc-url $RPC_URL --private-key $PRIVATE_KEY $SERIES_FACTORY_ADDR "updateRentTokenImplementation(address)" $RENT_TOKEN_IMPL_ADDR
+cast send --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY $SERIES_FACTORY_ADDR "updateRentTokenImplementation(address)" $RENT_TOKEN_IMPL_ADDR
 echo "Set RentToken implementation in SeriesFactory"
 
 # 导出环境变量
