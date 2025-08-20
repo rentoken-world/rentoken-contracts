@@ -116,3 +116,54 @@ echo "USDC symbol: $USDC_SYMBOL"
 # 验证 SanctionOracle (调用 isSanctioned(0x000...000))
 SANCTION_CHECK=$(cast call --rpc-url $RPC_URL $SANCTION_ORACLE_ADDR "isSanctioned(address)(bool)" 0x0000000000000000000000000000000000000000)
 echo "SanctionOracle isSanctioned(0x0): $SANCTION_CHECK"
+
+# 用usdc巨鲸账户给user充值，每人1e4 usdc
+echo "💰 Funding test accounts with USDC from whale..."
+
+# 使用已知的 USDC 巨鲸账户
+USDC_WHALE=0x55fe002aeff02f77364de339a1292923a15844b8
+
+# 模拟巨鲸账户
+cast rpc --rpc-url $RPC_URL anvil_impersonateAccount $USDC_WHALE
+
+# 给每个测试账户充值 10000 USDC (1e4 * 1e6 = 1e10)
+echo "💸 Transferring 10000 USDC to each test account..."
+
+# 给 ADMIN 充值
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $ADMIN_ADDRESS 10000000000 || { echo "❌ Failed to fund ADMIN"; exit 1; }
+echo "✅ ADMIN funded with 10000 USDC"
+
+# 给 USER1 充值
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER1_ADDRESS 10000000000 || { echo "❌ Failed to fund USER1"; exit 1; }
+echo "✅ USER1 funded with 10000 USDC"
+
+# 给 USER2 充值
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER2_ADDRESS 10000000000 || { echo "❌ Failed to fund USER2"; exit 1; }
+echo "✅ USER2 funded with 10000 USDC"
+
+# 给 USER3 充值
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER3_ADDRESS 10000000000 || { echo "❌ Failed to fund USER3"; exit 1; }
+echo "✅ USER3 funded with 10000 USDC"
+
+# 给 USER4 充值
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER4_ADDRESS 10000000000 || { echo "❌ Failed to fund USER4"; exit 1; }
+echo "✅ USER4 funded with 10000 USDC"
+
+# 停止模拟巨鲸账户
+cast rpc --rpc-url $RPC_URL anvil_stopImpersonatingAccount $USDC_WHALE
+
+# 验证充值结果
+echo "🔍 Verifying USDC balances..."
+
+ADMIN_USDC_BALANCE=$(cast call --rpc-url $RPC_URL $USDC_ADDR "balanceOf(address)(uint256)" $ADMIN_ADDRESS)
+USER1_USDC_BALANCE=$(cast call --rpc-url $RPC_URL $USDC_ADDR "balanceOf(address)(uint256)" $USER1_ADDRESS)
+USER2_USDC_BALANCE=$(cast call --rpc-url $RPC_URL $USDC_ADDR "balanceOf(address)(uint256)" $USER2_ADDRESS)
+USER3_USDC_BALANCE=$(cast call --rpc-url $RPC_URL $USDC_ADDR "balanceOf(address)(uint256)" $USER3_ADDRESS)
+USER4_USDC_BALANCE=$(cast call --rpc-url $RPC_URL $USDC_ADDR "balanceOf(address)(uint256)" $USER4_ADDRESS)
+
+echo "USDC Balances:"
+echo "  ADMIN:  $ADMIN_USDC_BALANCE (should be >= 10000000000)"
+echo "  USER1:  $USER1_USDC_BALANCE (should be >= 10000000000)"
+echo "  USER2:  $USER2_USDC_BALANCE (should be >= 10000000000)"
+echo "  USER3:  $USER3_USDC_BALANCE (should be >= 10000000000)"
+echo "  USER4:  $USER4_USDC_BALANCE (should be >= 10000000000)"
