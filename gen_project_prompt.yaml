@@ -1,0 +1,147 @@
+项目说明:
+  目标: |
+    建设一个RWA 平台,允许线下的房东和公司将自己的房产未来收益质押到链上,发行erc20 token获得融资。
+    每个房产项目对应一个ERC20 Token,房租定期打入合约,持有人可以随时提取利润。
+  链下:
+    WebUI: 有另一个repo去负责，这里忽略。
+    链下的管理脚本:
+      描述: |
+        提供基于cast命令的CLI脚本,可由admin身份与链上合约交互。后续版本考虑把管理页面做到网页里,当前mvp不做。
+      操作:
+        - 部署SeriesFactory合约的脚本: 平台控制合约,提供路由和入口。
+        - 部署PropertyOracle合约的脚本: oracle合约，提供房产信息查询。
+        - 添加/更新PropertyOracle记录的脚本:
+        - 管理erc20 rent token的脚本:
+          - 从seriesfactory合约发行脚本
+          - 向erc20合约转每月月租账目,分配收益的脚本
+  链上:
+    平台包含一个SeriesFactory合约、一个PropertyOracle合约，以及多个RTN Series合约。
+    SeriesFactory合约:
+      功能:
+        - 记录PropertyOracle合约地址。
+        - 发行RTN 代币合约
+          - ERC20合约
+          - 具备分红池功能和
+          - 交易设定KYC,sanction验证
+        - 租金入金与费用路径:
+          - 租客将租金打入平台银行账户；平台按线下协议扣除管理费与相关费用后，将净利润兑换为 USDC
+          - 平台调用 SeriesFactory 的入金方法；SeriesFactory 作为唯一入口，转调对应 RT*** 合约的 receiveProfit
+          - 仅允许有权限的 operator/admin 调用；链上不再扣平台费（净额入账）
+        - 部署RTN 代币合约,每个合约必须基于一个PropertyOracle中的propertyId。
+        - 记录已发行的RTN 代币合约
+        - 发行RTN 代币合约时需指定:
+          - propertyId
+        - 部署行为: 部署时从 PropertyOracle 读取 minRaising/maxRaising 等关键参数，并将其快照固化到系列合约
+      - 合约状态变量:
+        - propertyOracle:  PropertyOracle 合约,作为只读存储，披露房产信息
+        - propertyIdToSeries: propertyId => series 合约地址映射
+        - operator/admin 角色: 用于 receiveProfit 等受限操作
+      - 方法:
+        - receiveProfit:
+          - 参数: propertyId, amount
+          - 权限: 仅 operator/admin
+          - 路由: 基于 propertyId 定位 series 合约；若不存在映射则拒绝
+          - 资金: 使用 payoutToken.safeTransferFrom(msg.sender, series, amount) 转入净额
+          - 调用: 随后调用 series.receiveProfit(amount)
+          - 事件: 触发 ProfitForwarded(propertyId, series, amount, msg.sender)
+      - 关于发行erc20合约的逻辑:
+        需要采用代理合约，也就是每一个erc20合约都是保存数据，然后借用一个implementation合约实现逻辑。
+    RT*** 代币合约:
+      - 功能: |
+          erc20代币,是一个未来N年房租的链上所有权表示。
+          参与筹款,发行,运营,终结的生命周期。
+          记录用户份额和跟踪资金提取
+
+      - 是由SeriesFactory合约部署的:
+        - 名字例子: "RenToken Amsterdam 001, "RenToken Shanghai Bund A"
+        - symbol例子: RTAMS1, RTSHBND
+      - 合约状态变量:
+        - accumulatedRewardPerToken: 代表截止目前,每一枚token可以分到的累积收益,用USDC/RTN作为单位
+        - propertyOracle: PropertyOracle 合约，披露房产信息
+        - propertyId: 对应的PropertyOracle的propertyId
+        - minRaising: 募集下限(部署时从PropertyOracle快照)
+        - maxRaising: 募集上限(部署时从PropertyOracle快照)
+        - totalFundRaised: 发售期间累计收到的usdc投资总额,用于统计总融资金额
+        - totalProfitReceived: 租金usdc累加器, 跟踪接收到的总租金额度
+        - seriesFactory合约地址: 用于做权限检查
+        - landlordWalletAddress: 房东钱包地址：房东是个特殊的用户,需要记录
+        - kycOracle: 合约地址
+        - sanctionOracle: 合约地址: 公网上的sanction 合约地址。
+      - 合约方法(注意：不一定全,可以添加):
+        - getPhase:
+          - 合约自动判断当前状态。
+          - 根据PropertyOracle获取起息和止息的日期,自动判断。
+          - 合约状态:
+            - fundrising: 认购阶段,只能mint RenToken
+            - accrualStarted: 发售成功运行中,定期接收分红,用户按照算法去提取分红,用户可以在kyc的限制下交易token
+            - risingFailed: 筹款额度没有达到min 额度,不发行,所有筹款人可以提取自己的usdc
+            - accrualFinished: 合约到期,不再有新的分红进入。
+            - terminated: 合约到期时间足够久,admin提取所有尚未被claim的usdc,默认为risingFailed 或者accrualFinished 之后180天后。
+        - claim: |
+          用户操作,触发将当前可用分红更新进入个人的claimable参数的作用,刷新debt 和claimable
+          尝试将用户名下claimable的erc20资金额度转入用户的地址下
+        - 其他erc20的标准操作,不过加入两点:
+          - 如果操作会更改用户的amount,那么要提取所有未分配利润进入claimable,然后再根据当前的acc更新amount和debt
+          - 除了只读操作外,操作要对收发方都做kyc和sanction验证,考虑用一个modifier去做。
+        - 合约状态对操作的一些影响:
+          - fundrising阶段,不允许接收usdc利润,只接收投资资金; 仅允许按照 1 USDC = 1 RTN 铸币; 禁止 transfer/approve/burn; 因此每个地址的 amount 恰好等于其累计贡献的 USDC 金额, 用作失败退款的基准
+          - mint只允许在fundrising阶段进行
+          - 当 totalFundRaised 达到 maxRaising 时，停止接受新的投资（contribute 将直接拒绝）
+          - running阶段,不允许接收投资资金,也不允许再mint,可以接收利润分配操作
+          - finish阶段,不允许再接收利润分配,只可以claim
+          - terminated 阶段,用户不允许再做任何操作,只有admin可以提取合约里剩余的usdc到自己钱包里
+        - receiveProfit:
+          - 接收房租利润方法,检查发送方,只接收来自SeriesFactory的钱
+          - 更新accumulatedRewardPerToken
+        - contribute:
+          - 募集期投资入口，按 1 USDC = 1 RTN 定价，收到 USDC 后立刻为投资人铸造同等数量的 RTN
+          - 募集期内禁止 RTN 的 transfer/approve/burn，保证 amount 与累计 USDC 贡献额一致
+          - 若本次出资导致 totalFundRaised + amount > maxRaising，则交易直接拒绝（revert）
+          - 价格与小数精度: RTN 的 decimals 与 payoutToken 保持一致，确保 1:1 精确铸币；不足最小精度的金额将被拒绝
+          - 最小投资额: 至少 1 个最小精度单位（如 USDC 的 1e-6），可配置更高的 minContribution
+          - 单位倍数: amount 必须是最小精度单位的整数倍；若配置了 lotSize，则 amount 必须是 lotSize 的整数倍
+          - 超额部分: 一律拒绝本次交易（不接收并不找零）
+        - refund:
+          - 仅在 risingFailed 阶段可调用；按用户当前 amount 作为 USDC 退款基准退款，并将其 amount 减少相同数量（或销毁对应 RTN）
+          - 退款后更新 totalFundRaised、用户 debt/claimable 等相关会计参数，避免遗留分红状态
+      - 计算利益分配的原理: |
+        在传统的erc20 之上,每个用户信息里有三个信息,amount,debt,claimable。
+        amount是用户当前持有代币的数量。
+        每次amount发生变化的时候,不管是增加还是减少,都用 旧的amount * accumulatedRewardPerToken - debt 得到一个可以分配的金额,加入到claimable里
+        然后把amount更新成为新的amount,用amount * accumulatedRewardPerToken得到新的debt
+        用户可以通过claim办法去提取不超过claimable里金额的 usdc到自己的账户里。
+      - 关于更新accumulatedRewardPerToken 参数的说明: |
+        这个参数是每次有房租收益通过SeriesFactory合约转入RT*** 合约的时候更新,公式是 acc_new = acc_old + profix/totalTokenAmountAtThisMoment
+        它代表了累积的收益在每一个代币上的体现。
+      - 关于risingfailed状态下退款的说明: |
+        risingfailed状态是当accrualStartDatetime过了以后,totalFundRaised < minRaising,说明筹集来的资金没有满足最小发售门槛。
+        这个门槛是由PropertyOracle设定并在部署时快照,进入退款环节。在这个环节里,每个用户可以呼叫refund 方法
+
+    PropertyOracle合约:
+      功能: 充当房产链上Oracle,披露所有与房产相关的信息。
+      接口: |
+      struct PropertyData {
+      uint256 propertyId;        // 资产ID
+      address payoutToken;       // 分红/募集币种(如 USDC)
+      uint256 valuation;         // 估值(未来现金流折现)
+      uint256 minRaising;        // 最小募集额(USDC)
+      uint256 maxRaising;        // 最大募集额(USDC)
+      uint64  accrualStart;      // 起息(Unix time)
+      uint64  accrualEnd;        // 止息(Unix time)
+      uint16  feeBps;            // 平台费,基点（本版净额已在链下扣除，可设 0 或忽略）
+      address landlord;          // 房东/收益权所有者
+      bytes32 docHash;           // 线下材料的内容哈希(如 IPFS 文件的 keccak256)
+      string  city;              // 城市(可选,字符串要谨慎,Gas 贵)
+      string  offchainURL;       // 资料URL(可选)
+      }
+      function getProperty(uint256 assetId) external view
+          returns (PropertyData memory data, uint64 version);
+      function getPropertyPacked(uint256 assetId) external view
+          returns (bytes memory packed, uint64 version);
+      // 每次update，都要更新版本号
+      function versionOf(uint256 assetId) external view returns (uint64);
+    KycOracle合约:
+      功能: 链下完成kyc认证以后，由kycoracle的admin去上传用户的地址进入kycOracle合约，自己部署
+      支持 IKYCOracle.isWhitelisted(addr)返回bool表示是否是白名单，非EOA地址经过验证后也可以加入。
+    AMML流动性池合约:
+      功能: 支持我们的kyc要求的流动性池子。具体方式是采用质押还是uniswap待定。暂时不放在本版本里。

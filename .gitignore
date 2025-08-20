@@ -103,8 +103,8 @@ temp/
 *.sol.ts
 
 # Foundry
-foundry.toml
-remappings.txt
+
+lib/
 
 # Hardhat
 hardhat.config.js

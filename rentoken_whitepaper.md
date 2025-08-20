@@ -1,11 +1,12 @@
-# Rentoken 技术白皮书（v0.3）
-
+# Rentoken 技术白皮书（v0.1）
 ## 摘要
 
+#
+
 Rentoken 是一个面向房产租金收益的 RWA 协议，允许房东将未来 1–5 年的房租应收款上
-链，发行合规受限的 ERC20 Token。 **与前版不同**：本版本采用 **集中控制模式**，所
-有投资与租金流动统一通过 **SeriesFactory** 入口合约进行，确保合规模块集中、安全
-性更高、用户体验更一致。
+链，发行合规受限的 ERC20 Token。
+
+每个房产对应一个ERC20 Token，房租定期打入合约，持有人可以随时提取利润。
 
 ---
 
@@ -13,7 +14,7 @@ Rentoken 是一个面向房产租金收益的 RWA 协议，允许房东将未来
 
 ### 模块组成
 
-1. **Property Oracle (ERC-721)**
+1. **Property NFT (ERC-721)**
 
    - 表征单个房产，元数据包含法律文件哈希与租约信息。
    - 由房东与 Rentoken 实体链下交互完成注册/更新。
@@ -39,10 +40,10 @@ Rentoken 是一个面向房产租金收益的 RWA 协议，允许房东将未来
      - 创建新的 Series（ERC-1404 + ERC-2222）。
      - 统一处理投资人入金：`depositUSDC(propertyId, amount)`。
      - 接收租金：`receiveRent(propertyId, amount)`。
-     - 调用 Series Token 的 `mint()` / `distribute()`。
+     - 调用 Rent Token 的 `mint()` / `distribute()`。
    - 实际成为协议的「Protocol Gateway」。
 
-6. **Series Token (ERC-1404 + ERC-2222)**
+6. **Rent Token (ERC-1404 + ERC-2222)**
 
    - ERC-1404：受限转账（仅白名单 + 未被制裁地址）。
    - ERC-2222：Funds Distribution Token，用于分配租金收益。
@@ -92,16 +93,16 @@ Rentoken 是一个面向房产租金收益的 RWA 协议，允许房东将未来
    - 内部完成：
      - Sanction + KYC 校验
      - 调用 USDC `permit()`
-     - 将资金换取对应 Series Token。
+     - 将资金换取对应 Rent Token。
 
 5. **租金分配**
 
    - 租客支付租金到 Factory：`receiveRent(propertyId, amount)`
-   - Factory 路由到对应 Series Token 的 `distribute()`。
+   - Factory 路由到对应 Rent Token 的 `distribute()`。
 
 6. **投资人提取收益**
 
-   - `SeriesToken.withdrawFunds()`。
+   - `RenToken.withdrawFunds()`。
 
 7. **合约到期**
    - Series 进入 `Matured` 状态。
@@ -140,7 +141,7 @@ interface ISeriesFactory {
 }
 ```
 
-### Series Token (ERC-1404 + ERC-2222)
+### Rent Token (ERC-1404 + ERC-2222)
 
 ```solidity
 interface IRentokenSeries {
@@ -212,7 +213,7 @@ sequenceDiagram
     participant Oracle as Oracle(房产/租金)
     participant SeriesFactory as SeriesFactory(控制合约)
     participant Investor as 投资人
-    participant SeriesToken as SeriesToken(ERC-1404 + ERC-2222)
+    participant RenToken as RenToken(ERC-1404 + ERC-2222)
 
     Note over Landlord,SeriesFactory: 房东抵押未来租金收益
     Landlord->>Oracle: 提交房产NFT与法律文件
@@ -220,17 +221,17 @@ sequenceDiagram
 
     Note over Investor,SeriesFactory: 投资人入场
     Investor->>SeriesFactory: 存入USDC
-    SeriesFactory->>SeriesToken: mint SeriesToken
-    SeriesFactory->>Investor: 分配SeriesToken
+    SeriesFactory->>RenToken: mint RenToken
+    SeriesFactory->>Investor: 分配RenToken
 
     Note over Oracle,SeriesFactory: 租金周期中
     Oracle->>SeriesFactory: 推送租金收益数据
-    SeriesFactory->>SeriesToken: 将收益注入ERC-2222分配功能
-    SeriesToken->>Investor: 投资人按比例领取收益 (withdrawFunds)
+    SeriesFactory->>RenToken: 将收益注入ERC-2222分配功能
+    RenToken->>Investor: 投资人按比例领取收益 (withdrawFunds)
 
     Note over SeriesFactory,Investor: 租金周期结束
-    SeriesFactory-->>SeriesToken: 停止mint
-    SeriesFactory-->>SeriesToken: 清算最后收益
-    SeriesToken-->>Investor: 投资人领取最后一笔分红
+    SeriesFactory-->>RenToken: 停止mint
+    SeriesFactory-->>RenToken: 清算最后收益
+    RenToken-->>Investor: 投资人领取最后一笔分红
     SeriesFactory-->>SeriesFactory: Series关闭
 ```
