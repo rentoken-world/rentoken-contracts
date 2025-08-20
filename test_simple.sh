@@ -103,14 +103,12 @@ MAX_RAISING=5000000000   # 5000 USDC
 CURRENT_TIMESTAMP=$(cast block --rpc-url $RPC_URL latest --field timestamp)
 ACCRUAL_START=$(($CURRENT_TIMESTAMP + 3600))  # 1 hour in future
 ACCRUAL_END=$(($ACCRUAL_START + 31536000))  # +1 year
-FEE_BPS=0
 LANDLORD=$ADMIN_ADDRESS
 DOC_HASH=0x0000000000000000000000000000000000000000000000000000000000000000
-CITY="TestCity"
 OFFCHAIN_URL="http://example.com"
 
 # Encode the struct for addOrUpdateProperty
-cast send $PROPERTY_ORACLE "addOrUpdateProperty(uint256,(uint256,address,uint256,uint256,uint256,uint64,uint64,uint16,address,bytes32,string,string))" $PROPERTY_ID "($PROPERTY_ID,$PAYOUT_TOKEN,$VALUATION,$MIN_RAISING,$MAX_RAISING,$ACCRUAL_START,$ACCRUAL_END,$FEE_BPS,$LANDLORD,$DOC_HASH,$CITY,$OFFCHAIN_URL)" --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY || { echo "❌ Failed to add property"; exit 1; }
+cast send $PROPERTY_ORACLE "addOrUpdateProperty(uint256,(uint256,address,uint256,uint256,uint256,uint64,uint64,address,bytes32,string))" $PROPERTY_ID "($PROPERTY_ID,$PAYOUT_TOKEN,$VALUATION,$MIN_RAISING,$MAX_RAISING,$ACCRUAL_START,$ACCRUAL_END,$LANDLORD,$DOC_HASH,$OFFCHAIN_URL)" --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY || { echo "❌ Failed to add property"; exit 1; }
 
 echo "✅ Test property added"
 
