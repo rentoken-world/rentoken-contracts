@@ -115,7 +115,7 @@ contract RentTokenTest is Test {
         assertEq(rentToken.maxRaising(), MAX_RAISING);
         assertEq(rentToken.accrualStart(), accrualStart);
         assertEq(rentToken.accrualEnd(), accrualEnd);
-        assertEq(uint(rentToken.getPhase()), uint(RentToken.Phase.Fundraising));
+        assertEq(uint256(rentToken.getPhase()), uint256(RentToken.Phase.Fundraising));
     }
 
     function test_Contribute() public {
@@ -143,7 +143,7 @@ contract RentTokenTest is Test {
         // Move to AccrualStarted phase
         vm.warp(accrualStart + 1);
         vm.assume(rentToken.totalFundRaised() >= MIN_RAISING); // Ensure phase is AccrualStarted
-        assertEq(uint(rentToken.getPhase()), uint(RentToken.Phase.AccrualStarted));
+        assertEq(uint256(rentToken.getPhase()), uint256(RentToken.Phase.AccrualStarted));
 
         // Transfer
         uint256 transferAmount = 200 * 1e6;
@@ -164,7 +164,7 @@ contract RentTokenTest is Test {
 
         // Warp to accrual started
         vm.warp(accrualStart + 1);
-        assertEq(uint(rentToken.getPhase()), uint(RentToken.Phase.AccrualStarted));
+        assertEq(uint256(rentToken.getPhase()), uint256(RentToken.Phase.AccrualStarted));
 
         // Receive profit
         uint256 profitAmount = 1000 * 1e6;

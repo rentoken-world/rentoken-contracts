@@ -74,8 +74,8 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
         if (from != address(0) && to != address(0)) {
             require(IKYC(kycOracle).isWhitelisted(from), "RentToken: Sender not KYC verified");
             require(IKYC(kycOracle).isWhitelisted(to), "RentToken: Recipient not KYC verified");
-            require(!ISanctionOracle(sanctionOracle).isBlocked(from), "RentToken: Sender is sanctioned");
-            require(!ISanctionOracle(sanctionOracle).isBlocked(to), "RentToken: Recipient is sanctioned");
+            require(!ISanctionOracle(sanctionOracle).isSanctioned(from), "RentToken: Sender is sanctioned");
+            require(!ISanctionOracle(sanctionOracle).isSanctioned(to), "RentToken: Recipient is sanctioned");
         }
         _;
     }
