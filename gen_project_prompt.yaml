@@ -128,10 +128,8 @@
       uint256 maxRaising;        // 最大募集额(USDC)
       uint64  accrualStart;      // 起息(Unix time)
       uint64  accrualEnd;        // 止息(Unix time)
-      uint16  feeBps;            // 平台费,基点（本版净额已在链下扣除，可设 0 或忽略）
       address landlord;          // 房东/收益权所有者
       bytes32 docHash;           // 线下材料的内容哈希(如 IPFS 文件的 keccak256)
-      string  city;              // 城市(可选,字符串要谨慎,Gas 贵)
       string  offchainURL;       // 资料URL(可选)
       }
       function getProperty(uint256 assetId) external view
@@ -144,4 +142,34 @@
       功能: 链下完成kyc认证以后，由kycoracle的admin去上传用户的地址进入kycOracle合约，自己部署
       支持 IKYCOracle.isWhitelisted(addr)返回bool表示是否是白名单，非EOA地址经过验证后也可以加入。
     AMML流动性池合约:
+<<<<<<< HEAD
       功能: 支持我们的kyc要求的流动性池子。具体方式是采用质押还是uniswap待定。暂时不放在本版本里。
+=======
+      功能: 支持我们的kyc要求的流动性池子。具体方式是采用质押还是uniswap待定。暂时不放在本版本里。
+
+modules:
+  - name: KycPool
+    file: contracts/pool/KycPool.sol
+    purpose: KYC版 Uniswap v2 常数乘积池，交易对 RTN/USDC（6位小数）
+    deps: [KYCOracle(isWhitelisted)]
+    settings:
+      feeBps: 30 # 0.3%，可在0–100范围调整
+      lp_shares: non-transferable # 内部记账，不发行可转LP
+      isOpen: controlled by admin # 运行期开关
+    api:
+      - addLiquidity(amtRTN, amtUSDC, minShares, deadline)
+      - removeLiquidity(shares, minRTN, minUSDC, deadline)
+      - swapExactRTNForUSDC(amtIn, minOut, to, deadline)
+      - swapExactUSDCForRTN(amtIn, minOut, to, deadline)
+      - getReserves(), getPriceRTNinUSDC(), getPriceUSDCinRTN(), quote(), getAmountOut(), getAmountIn()
+
+  - name: KycPoolFactory
+    file: contracts/pool/KycPoolFactory.sol
+    purpose: 为 propertyId 创建并管理唯一 KycPool
+    api:
+      - createPool(propertyId, rtk, usdc, feeBps) -> pool [admin]
+      - openTrading(propertyId) / closeTrading(propertyId) [admin]
+    mapping:
+      - poolOf[propertyId] -> poolAddress
+    notes: 池地址加入白名单由外部调用 KYCOracle 管理接口完成
+>>>>>>> main

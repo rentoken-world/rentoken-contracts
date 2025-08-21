@@ -56,10 +56,8 @@ contract RentTokenTest is Test {
             maxRaising: MAX_RAISING,
             accrualStart: accrualStart,
             accrualEnd: accrualEnd,
-            feeBps: 100,
             landlord: landlord,
             docHash: keccak256("docs"),
-            city: "TestCity",
             offchainURL: "https://example.com"
         });
 
@@ -244,10 +242,8 @@ contract RentTokenInvariantTest is Test {
             maxRaising: MAX_RAISING,
             accrualStart: accrualStart,
             accrualEnd: accrualEnd,
-            feeBps: 100,
             landlord: landlord,
             docHash: keccak256("docs"),
-            city: "TestCity",
             offchainURL: "https://example.com"
         });
 
