@@ -146,7 +146,7 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
             if (block.timestamp >= accrualEnd + 180 days) {
                 return Phase.Terminated;
             }
-            
+
             if (totalFundRaised >= minRaising) {
                 return Phase.AccrualFinished;
             } else {
@@ -163,7 +163,7 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
     function contribute(uint256 amount) external onlyInPhase(Phase.Fundraising) updateReward(msg.sender) whenNotPaused {
         require(amount > 0, "RentToken: Amount must be positive");
         require(totalFundRaised + amount <= maxRaising, "RentToken: Exceeds max raising");
-        
+
         // KYC and sanction checks
         require(IKYC(kycOracle).isWhitelisted(msg.sender), "RentToken: Contributor not KYC verified");
         require(!ISanctionOracle(sanctionOracle).isSanctioned(msg.sender), "RentToken: Contributor is sanctioned");
@@ -293,6 +293,24 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
         require(getPhase() != Phase.Terminated, "RentToken: Contract terminated");
 
         return super.transferFrom(from, to, amount);
+    }
+
+    /**
+     * @dev Admin function to set accrual start time
+     * @notice Only callable in fundraising phase, sets accrualStart to current time + 0.01 seconds
+     */
+    function setStartTime() external onlyOwner onlyInPhase(Phase.Fundraising) {
+        uint64 newStartTime = uint64(block.timestamp) + 1; // +1 second (0.01 seconds not possible with uint64)
+
+        // Emit phase change event if this will trigger a phase change
+        Phase oldPhase = getPhase();
+        accrualStart = newStartTime;
+
+        // Check if phase will change after this update
+        Phase newPhase = getPhase();
+        if (oldPhase != newPhase) {
+            emit PhaseChanged(oldPhase, newPhase);
+        }
     }
 
     /**

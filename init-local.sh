@@ -141,28 +141,28 @@ USDC_WHALE=0x55fe002aeff02f77364de339a1292923a15844b8
 # 模拟巨鲸账户
 cast rpc --rpc-url $RPC_URL anvil_impersonateAccount $USDC_WHALE
 
-# 给每个测试账户充值 10000 USDC (1e4 * 1e6 = 1e10)
-echo "💸 Transferring 10000 USDC to each test account..."
+# 给每个测试账户充值 100000 USDC (1e5 * 1e6 = 1e11)
+echo "💸 Transferring 100000 USDC to each test account..."
 
 # 给 ADMIN 充值
-cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $ADMIN_ADDRESS 10000000000 || { echo "❌ Failed to fund ADMIN"; exit 1; }
-echo "✅ ADMIN funded with 10000 USDC"
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $ADMIN_ADDRESS 100000000000 || { echo "❌ Failed to fund ADMIN"; exit 1; }
+echo "✅ ADMIN funded with 100000 USDC"
 
 # 给 USER1 充值
-cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER1_ADDRESS 10000000000 || { echo "❌ Failed to fund USER1"; exit 1; }
-echo "✅ USER1 funded with 10000 USDC"
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER1_ADDRESS 100000000000 || { echo "❌ Failed to fund USER1"; exit 1; }
+echo "✅ USER1 funded with 100000 USDC"
 
 # 给 USER2 充值
-cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER2_ADDRESS 10000000000 || { echo "❌ Failed to fund USER2"; exit 1; }
-echo "✅ USER2 funded with 10000 USDC"
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER2_ADDRESS 100000000000 || { echo "❌ Failed to fund USER2"; exit 1; }
+echo "✅ USER2 funded with 100000 USDC"
 
 # 给 USER3 充值
-cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER3_ADDRESS 10000000000 || { echo "❌ Failed to fund USER3"; exit 1; }
-echo "✅ USER3 funded with 10000 USDC"
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER3_ADDRESS 100000000000 || { echo "❌ Failed to fund USER3"; exit 1; }
+echo "✅ USER3 funded with 100000 USDC"
 
 # 给 USER4 充值
-cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER4_ADDRESS 10000000000 || { echo "❌ Failed to fund USER4"; exit 1; }
-echo "✅ USER4 funded with 10000 USDC"
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC_ADDR "transfer(address,uint256)" $USER4_ADDRESS 100000000000 || { echo "❌ Failed to fund USER4"; exit 1; }
+echo "✅ USER4 funded with 100000 USDC"
 
 # 停止模拟巨鲸账户
 cast rpc --rpc-url $RPC_URL anvil_stopImpersonatingAccount $USDC_WHALE
@@ -177,11 +177,11 @@ USER3_USDC_BALANCE=$(cast call --rpc-url $RPC_URL $USDC_ADDR "balanceOf(address)
 USER4_USDC_BALANCE=$(cast call --rpc-url $RPC_URL $USDC_ADDR "balanceOf(address)(uint256)" $USER4_ADDRESS)
 
 echo "USDC Balances:"
-echo "  ADMIN:  $ADMIN_USDC_BALANCE (should be >= 10000000000)"
-echo "  USER1:  $USER1_USDC_BALANCE (should be >= 10000000000)"
-echo "  USER2:  $USER2_USDC_BALANCE (should be >= 10000000000)"
-echo "  USER3:  $USER3_USDC_BALANCE (should be >= 10000000000)"
-echo "  USER4:  $USER4_USDC_BALANCE (should be >= 10000000000)"
+echo "  ADMIN:  $ADMIN_USDC_BALANCE (should be >= 100000000000)"
+echo "  USER1:  $USER1_USDC_BALANCE (should be >= 100000000000)"
+echo "  USER2:  $USER2_USDC_BALANCE (should be >= 100000000000)"
+echo "  USER3:  $USER3_USDC_BALANCE (should be >= 100000000000)"
+echo "  USER4:  $USER4_USDC_BALANCE (should be >= 100000000000)"
 
 echo "" >> $ENV_FILE
 echo "# USDC Whale for funding" >> $ENV_FILE
