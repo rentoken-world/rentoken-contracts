@@ -161,6 +161,9 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
      * @dev Contribute USDC to get RTN tokens (only in fundraising phase)
      */
     function contribute(uint256 amount) external onlyInPhase(Phase.Fundraising) updateReward(msg.sender) {
+        // Check KYC for contributor only
+        require(IKYC(kycOracle).isWhitelisted(msg.sender), "RentToken: Contributor not KYC verified");
+        require(!ISanctionOracle(sanctionOracle).isSanctioned(msg.sender), "RentToken: Contributor is sanctioned");
         require(amount > 0, "RentToken: Amount must be positive");
         require(totalFundRaised + amount <= maxRaising, "RentToken: Exceeds max raising");
 
