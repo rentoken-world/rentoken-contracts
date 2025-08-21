@@ -81,8 +81,9 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
     }
 
     modifier updateReward(address account) {
-        _updateReward(account);
+        _updateClaimable(account);
         _;
+        _resetDebt(account); // dbt always after amount changes
     }
 
     /// @custom:oz-upgrades-unsafe-allow-constructor
@@ -221,14 +222,20 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
     }
 
     /**
-     * @dev Update reward for an account
+     * @dev Update debt for an account
      */
-    function _updateReward(address account) internal {
+    function _resetDebt(address account) internal {
+        debt[account] = balanceOf(account) * accumulatedRewardPerToken / 1e18;
+    }
+
+    /**
+     * @dev Update claimable for an account
+     */
+    function _updateClaimable(address account) internal {
         uint256 reward = (balanceOf(account) * accumulatedRewardPerToken / 1e18) - debt[account];
         if (reward > 0) {
             claimable[account] += reward;
         }
-        debt[account] = balanceOf(account) * accumulatedRewardPerToken / 1e18;
     }
 
     /**
