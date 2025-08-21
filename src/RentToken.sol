@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "./interfaces/IKYCOracle.sol";
 import "./interfaces/ISanctionOracle.sol";
 
@@ -146,7 +147,7 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
             if (block.timestamp >= accrualEnd + 180 days) {
                 return Phase.Terminated;
             }
-            
+
             if (totalFundRaised >= minRaising) {
                 return Phase.AccrualFinished;
             } else {
@@ -163,12 +164,48 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
     function contribute(uint256 amount) external onlyInPhase(Phase.Fundraising) updateReward(msg.sender) whenNotPaused {
         require(amount > 0, "RentToken: Amount must be positive");
         require(totalFundRaised + amount <= maxRaising, "RentToken: Exceeds max raising");
-        
+
         // KYC and sanction checks
         require(IKYC(kycOracle).isWhitelisted(msg.sender), "RentToken: User not whitelisted");
         require(!ISanctionOracle(sanctionOracle).isSanctioned(msg.sender), "RentToken: User is sanctioned");
 
         // Transfer USDC from user
+        IERC20(payoutToken).safeTransferFrom(msg.sender, address(this), amount);
+
+        // Mint RTN tokens 1:1
+        _mint(msg.sender, amount);
+        totalFundRaised += amount;
+
+        emit ContributionReceived(msg.sender, amount, amount);
+    }
+
+    /**
+     * @dev Permit-based deposit using EIP-2612 to avoid prior approve
+     * @notice Investor deposits payoutToken with a single transaction
+     * @param amount Deposit amount (must respect decimals and limits)
+     * @param deadline EIP-2612 permit deadline
+     * @param v Signature v
+     * @param r Signature r
+     * @param s Signature s
+     */
+    function permitDeposit(
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external onlyInPhase(Phase.Fundraising) updateReward(msg.sender) whenNotPaused {
+        require(amount > 0, "RentToken: Amount must be positive");
+        require(totalFundRaised + amount <= maxRaising, "RentToken: Exceeds max raising");
+
+        // KYC and sanction checks
+        require(IKYC(kycOracle).isWhitelisted(msg.sender), "RentToken: User not whitelisted");
+        require(!ISanctionOracle(sanctionOracle).isSanctioned(msg.sender), "RentToken: User is sanctioned");
+
+        // EIP-2612 permit to approve this contract to spend payoutToken on behalf of msg.sender
+        IERC20Permit(payoutToken).permit(msg.sender, address(this), amount, deadline, v, r, s);
+
+        // Transfer funds
         IERC20(payoutToken).safeTransferFrom(msg.sender, address(this), amount);
 
         // Mint RTN tokens 1:1

@@ -46,6 +46,18 @@
           - 事件: 触发 ProfitForwarded(propertyId, series, amount, msg.sender)
       - 关于发行erc20合约的逻辑:
         需要采用代理合约，也就是每一个erc20合约都是保存数据，然后借用一个implementation合约实现逻辑。
+      - 关于投资人转账的流程:
+        - 投资人可直接与对应的 RT*** 合约交互完成入金
+        - 两种入金方式：
+          1) approve + contribute(amount)
+          2) permitDeposit(amount, deadline, v, r, s) 基于 EIP-2612 免 approve 入金
+        - 校验：仅在 Fundraising 阶段；KYC + Sanction 必须通过；不得超过 maxRaising
+        - 精度：RTN 的 decimals 与 payoutToken 对齐（默认 6），1 USDC = 1 RTN
+      - 关于理财收益分配的流程:
+        - 仍通过 SeriesFactory.receiveProfit(propertyId, amount) 作为唯一入口
+        - Factory 将 USDC 转发到对应的 RT*** 合约并调用 receiveProfit(amount)
+        - 系列合约内部按 accumulatedRewardPerToken 记录与分配，投资人调用 claim() 提现
+
     RT*** 代币合约:
       - 功能: |
           erc20代币,是一个未来N年房租的链上所有权表示。

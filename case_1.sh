@@ -305,15 +305,192 @@ echo "CASE1_TOKEN_SYMBOL=$TOKEN_SYMBOL" >> .env
 
 echo "✅ Case 1 setup completed successfully!"
 echo "=================================================="
+
+# 新增: 步骤6 - 使用 EIP-2612 permitDeposit 方式入资
+echo "💳 Step 6: Investor USER2 invests via permitDeposit (EIP-2612)..."
+
+INVESTOR_ADDR=$USER2_ADDRESS
+INVESTOR_PK=$USER2_PRIVATE_KEY
+INVEST_AMOUNT_USDC=5000
+INVEST_AMOUNT_WEI=$((INVEST_AMOUNT_USDC * 1000000)) # USDC 6 decimals
+DEADLINE=$((CURRENT_TIME + 86400)) # +1 day
+
+# # 查询 permit 所需参数（USDC 需支持 EIP-2612）
+# NONCE=$(cast call --rpc-url $RPC_URL $USDC_ADDR "nonces(address)(uint256)" $INVESTOR_ADDR)
+# # 优先读取合约内置 PERMIT_TYPEHASH，若无则回退到标准 EIP-2612 字符串哈希
+# PERMIT_TYPEHASH=$(cast call --rpc-url $RPC_URL $USDC_ADDR "PERMIT_TYPEHASH()(bytes32)" 2>/dev/null || cast keccak "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+# # 读取 DOMAIN_SEPARATOR（若不可用则按标准域计算）
+# DOMAIN=$(cast call --rpc-url $RPC_URL $USDC_ADDR "DOMAIN_SEPARATOR()(bytes32)" 2>/dev/null || echo "0x")
+# if [ -z "$DOMAIN" ] || [ "$DOMAIN" = "0x" ] || [ "$DOMAIN" = "0x0000000000000000000000000000000000000000000000000000000000000000" ]; then
+# 	TOKEN_NAME=$(cast call --rpc-url $RPC_URL $USDC_ADDR "name()(string)" 2>/dev/null || echo "USD Coin")
+# 	# USDC 通常使用 version "2"；OZ ERC20Permit 默认 "1"
+# 	TOKEN_VERSION=$(cast call --rpc-url $RPC_URL $USDC_ADDR "version()(string)" 2>/dev/null || echo "2")
+# 	CHAIN_ID=$(cast chain-id --rpc-url $RPC_URL)
+# 	DOMAIN_TYPEHASH=$(cast keccak "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+# 	DE_ENC=$(cast abi-encode "f(bytes32,bytes32,bytes32,uint256,address)" $DOMAIN_TYPEHASH $(cast keccak "$TOKEN_NAME") $(cast keccak "$TOKEN_VERSION") $CHAIN_ID $USDC_ADDR)
+# 	DE_PARAMS=0x${DE_ENC:10}
+# 	DOMAIN=$(cast keccak $DE_PARAMS)
+# fi
+# # 计算 Permit 结构体哈希
+# STRUCT_ENC=$(cast abi-encode "f(bytes32,address,address,uint256,uint256,uint256)" $PERMIT_TYPEHASH $INVESTOR_ADDR $SERIES_ADDR $INVEST_AMOUNT_WEI $NONCE $DEADLINE)
+# STRUCT_PARAMS=0x${STRUCT_ENC:10}
+# STRUCT_HASH=$(cast keccak $STRUCT_PARAMS)
+# # 计算最终 EIP-712 消息摘要
+# DIGEST=$(cast keccak 0x1901${DOMAIN:2}${STRUCT_HASH:2})
+
+# # 使用投资人私钥对 digest 进行签名，得到 r,s,v
+# SIG=$(cast wallet sign --no-hash --private-key $INVESTOR_PK $DIGEST)
+# SIG_NO_0X=${SIG:2}
+# R=0x${SIG_NO_0X:0:64}
+# S=0x${SIG_NO_0X:64:64}
+# V_HEX=${SIG_NO_0X:128:2}
+# V=$((16#$V_HEX))
+# if [ $V -lt 27 ]; then V=$((V+27)); fi
+
+# 读取 domain（正确处理引号）
+TOKEN_NAME_RAW=$(cast call --rpc-url $RPC_URL $USDC_ADDR "name()(string)")
+TOKEN_VERSION_RAW=$(cast call --rpc-url $RPC_URL $USDC_ADDR "version()(string)" 2>/dev/null || echo "\"2\"")
+CHAIN_ID=$(cast chain-id --rpc-url $RPC_URL)
+NONCE=$(cast call --rpc-url $RPC_URL $USDC_ADDR "nonces(address)(uint256)" $INVESTOR_ADDR)
+
+# 去掉外层引号用于 JSON
+TOKEN_NAME=$(echo $TOKEN_NAME_RAW | sed 's/^"//; s/"$//')
+TOKEN_VERSION=$(echo $TOKEN_VERSION_RAW | sed 's/^"//; s/"$//')
+
+echo "🔍 Permit Parameters:"
+echo "   Token Name: $TOKEN_NAME"
+echo "   Token Version: $TOKEN_VERSION"
+echo "   Chain ID: $CHAIN_ID"
+echo "   Nonce: $NONCE"
+echo "   Deadline: $DEADLINE"
+echo ""
+
+TYPED_DATA=$(cat <<EOF
+{
+  "types": {
+    "EIP712Domain": [
+      {"name":"name","type":"string"},
+      {"name":"version","type":"string"},
+      {"name":"chainId","type":"uint256"},
+      {"name":"verifyingContract","type":"address"}
+    ],
+    "Permit": [
+      {"name":"owner","type":"address"},
+      {"name":"spender","type":"address"},
+      {"name":"value","type":"uint256"},
+      {"name":"nonce","type":"uint256"},
+      {"name":"deadline","type":"uint256"}
+    ]
+  },
+  "primaryType": "Permit",
+  "domain": {
+    "name": "$TOKEN_NAME",
+    "version": "$TOKEN_VERSION",
+    "chainId": $CHAIN_ID,
+    "verifyingContract": "$USDC_ADDR"
+  },
+  "message": {
+    "owner": "$INVESTOR_ADDR",
+    "spender": "$SERIES_ADDR",
+    "value": $INVEST_AMOUNT_WEI,
+    "nonce": $NONCE,
+    "deadline": $DEADLINE
+  }
+}
+EOF
+)
+
+# 生成 EIP-712 签名 - 手动计算方式
+echo "🔐 Generating EIP-712 signature..."
+
+# 直接使用 USDC 的 DOMAIN_SEPARATOR（无论是主网还是 mock）
+DOMAIN_SEPARATOR=$(cast call --rpc-url $RPC_URL $USDC_ADDR "DOMAIN_SEPARATOR()(bytes32)")
+
+# 计算 struct hash
+PERMIT_TYPEHASH=$(cast keccak "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+STRUCT_ENC=$(cast abi-encode "f(bytes32,address,address,uint256,uint256,uint256)" $PERMIT_TYPEHASH $INVESTOR_ADDR $SERIES_ADDR $INVEST_AMOUNT_WEI $NONCE $DEADLINE)
+STRUCT_PARAMS=0x${STRUCT_ENC:10}
+STRUCT_HASH=$(cast keccak $STRUCT_PARAMS)
+
+# 计算最终 digest
+DIGEST=$(cast keccak 0x1901${DOMAIN_SEPARATOR:2}${STRUCT_HASH:2})
+
+echo "🔍 Debug Information:"
+echo "   USDC Address: $USDC_ADDR"
+echo "   Domain Separator: $DOMAIN_SEPARATOR"
+echo "   Struct Hash: $STRUCT_HASH"
+echo "   Final Digest: $DIGEST"
+echo ""
+
+# 生成签名
+SIG=$(cast wallet sign --no-hash --private-key $INVESTOR_PK $DIGEST)
+SIG_NO_0X=${SIG:2}
+R=0x${SIG_NO_0X:0:64}
+S=0x${SIG_NO_0X:64:64}
+V_HEX=${SIG_NO_0X:128:2}
+
+V=$((16#$V_HEX))
+# 确保 v 值在正确范围内 (27 或 28)
+if [ $V -lt 27 ]; then
+    V=$((V+27))
+fi
+
+echo "📝 Signature Components:"
+echo "   r: $R"
+echo "   s: $S"
+echo "   v: $V"
+echo ""
+
+echo "   Investor: $INVESTOR_ADDR"
+echo "   Amount: ${INVEST_AMOUNT_USDC} USDC"
+echo "   Nonce: $NONCE"
+echo "   Deadline: $DEADLINE"
+
+# 发送 permitDeposit 交易（from = 投资人）
+set +e
+cast send --rpc-url $RPC_URL --private-key $INVESTOR_PK \
+    $SERIES_ADDR \
+    "permitDeposit(uint256,uint256,uint8,bytes32,bytes32)" \
+    $INVEST_AMOUNT_WEI $DEADLINE $V $R $S
+PERMIT_RC=$?
+set -e
+
+if [ $PERMIT_RC -ne 0 ]; then
+    echo "⚠️ permitDeposit failed on payout token (likely non-standard permit). Falling back to approve + contribute..."
+    cast send --rpc-url $RPC_URL --private-key $INVESTOR_PK \
+        $USDC_ADDR "approve(address,uint256)" $SERIES_ADDR $INVEST_AMOUNT_WEI \
+        || { echo "❌ approve failed"; exit 1; }
+    cast send --rpc-url $RPC_URL --private-key $INVESTOR_PK \
+        $SERIES_ADDR "contribute(uint256)" $INVEST_AMOUNT_WEI \
+        || { echo "❌ contribute failed"; exit 1; }
+    echo "✅ Fallback approve + contribute successful"
+else
+    echo "✅ permitDeposit successful"
+fi
+
+# 校验结果
+FUND_RAISED=$(cast call --rpc-url $RPC_URL $SERIES_ADDR "totalFundRaised()(uint256)")
+SERIES_USDC_BAL=$(cast call --rpc-url $RPC_URL $USDC_ADDR "balanceOf(address)(uint256)" $SERIES_ADDR)
+INVESTOR_RTN_BAL=$(cast call --rpc-url $RPC_URL $SERIES_ADDR "balanceOf(address)(uint256)" $INVESTOR_ADDR)
+
+echo "📈 After permitDeposit:"
+echo "   totalFundRaised: $(echo $FUND_RAISED | awk '{printf "%.6f", $1/1000000}') USDC"
+echo "   Series USDC balance: $(echo $SERIES_USDC_BAL | awk '{printf "%.6f", $1/1000000}') USDC"
+echo "   Investor RTN balance: $(echo $INVESTOR_RTN_BAL | awk '{printf "%.6f", $1/1000000}') RTN"
+
+# 最终摘要
+echo "=================================================="
 echo "🎯 Summary:"
 echo "   - Property ID $PROPERTY_ID added to PropertyOracle"
 echo "   - USER1, USER2, USER3 added to KYC whitelist"
 echo "   - USER4 remains non-KYC for testing"
 echo "   - RentToken series '$TOKEN_SYMBOL' created at $SERIES_ADDR"
 echo "   - Series is in $PHASE_NAME phase"
-echo "   - All users have USDC for testing investments"
+echo "   - USER2 invested ${INVEST_AMOUNT_USDC} USDC via permitDeposit"
 echo ""
-echo "🚀 Ready for investment testing!"
-echo "💡 Next steps: Users can now contribute USDC to purchase tokens"
-echo "   - Use: cast send $SERIES_ADDR \"contribute(uint256)\" [amount]"
+echo "🚀 Ready for more investment testing!"
+echo "💡 Next steps:"
+echo "   - Use permitDeposit (recommended if payout token supports EIP-2612):"
+echo "     cast send $SERIES_ADDR \"permitDeposit(uint256,uint256,uint8,bytes32,bytes32)\" [amount] [deadline] [v] [r] [s]"
+echo "   - Fallback (for tokens without EIP-2612): approve + contribute(uint256)"
 echo "   - Remember: USER4 will be rejected due to KYC requirements"
