@@ -174,4 +174,4 @@ modules:
     notes: 池地址加入白名单由外部调用 KYCOracle 管理接口完成
 scripts:
   - init-local.sh: 当anvil 以fork现网的方式运行之后，运行这个脚本以部署和初始化我们的平台，以及测试用户。
-  - add-properties.sh: 把预设的5套房产输入oracle，3套在发售中，1套运行中（需要先做够投资，然后用admin去setStartTime）
+  - setup_for_web.sh: 把预设的5套房产输入oracle，3套在发售中，1套运行中（需要先做够投资，然后用admin去setStartTime）
