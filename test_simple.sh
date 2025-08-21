@@ -37,20 +37,24 @@ echo "📦 Step 1.1: Deploying KYC Oracle..."
 KYC_ORACLE=$(forge create --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY src/KYCOracle.sol:KYCOracle --broadcast | get_deployed_address)
 echo "✅ KYC Oracle deployed at: $KYC_ORACLE"
 
+# Add Admin to KYC whitelist immediately after deployment
+echo "🔐 Adding Admin to KYC whitelist..."
+cast send $KYC_ORACLE --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY "addToWhitelist(address)" $ADMIN_ADDRESS || { echo "❌ Failed to add Admin to whitelist"; exit 1; }
+
 # Step 2: 部署 PropertyOracle
 echo "📦 Step 1.2: Deploying PropertyOracle..."
 PROPERTY_ORACLE=$(forge create --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY src/PropertyOracle.sol:PropertyOracle --broadcast | get_deployed_address)
 echo "✅ PropertyOracle deployed at: $PROPERTY_ORACLE"
 
-# Deploy MockSanctionOracle
-echo "📦 Deploying MockSanctionOracle..."
-SANCTION_ORACLE=$(forge create --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY src/mocks/MockSanctionOracle.sol:MockSanctionOracle --broadcast | get_deployed_address)
-echo "✅ MockSanctionOracle deployed at: $SANCTION_ORACLE"
+# Deploy ChainList SanctionOracle
+echo "📦 ChainList SanctionOracle..."
+SANCTION_ORACLE=0x40C57923924B5c5c5455c48D93317139ADDaC8fb
+echo "✅ ChainList SanctionOracle deployed at: $SANCTION_ORACLE"
 
-# Deploy MockUSDC
-echo "📦 Deploying MockUSDC..."
-USDC=$(forge create --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY src/mocks/MockUSDC.sol:MockUSDC --broadcast | get_deployed_address)
-echo "✅ MockUSDC deployed at: $USDC"
+# Deploy USDC
+echo "📦 USDC Address"
+USDC=0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
+echo "✅ USDC deployed at: $USDC"
 
 # Step 3: 部署 RentToken Implementation
 echo "📦 Step 1.3: Deploying RentToken Implementation..."
@@ -63,16 +67,23 @@ SERIES_FACTORY=$(forge create src/SeriesFactory.sol:SeriesFactory  --rpc-url $RP
 [ -n "$SERIES_FACTORY" ] || { echo "❌ Failed to deploy SeriesFactory"; exit 1; }
 echo "✅ SeriesFactory deployed at: $SERIES_FACTORY"
 
-# Remove ETH funding
-# Remove USDC funding with whale
+# Fund test accounts with USDC from whale
+echo "💰 Funding test accounts with USDC from whale..."
 
-echo ""
+# Impersonate whale
+cast rpc --rpc-url $RPC_URL anvil_impersonateAccount $USDC_WHALE
 
-# Add minting after deployments
-echo "💰 Minting MockUSDC to test accounts..."
-cast send $USDC --private-key $ADMIN_PRIVATE_KEY --rpc-url $RPC_URL "mint(address,uint256)" $USER1_ADDRESS 10000000000  # 10000 USDC
-cast send $USDC --private-key $ADMIN_PRIVATE_KEY --rpc-url $RPC_URL "mint(address,uint256)" $USER2_ADDRESS 10000000000
-cast send $USDC --private-key $ADMIN_PRIVATE_KEY --rpc-url $RPC_URL "mint(address,uint256)" $ADMIN_ADDRESS 10000000000
+# Transfer to USER1
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC "transfer(address,uint256)" $USER1_ADDRESS 10000000000  # 10000 USDC
+
+# Transfer to USER2
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC "transfer(address,uint256)" $USER2_ADDRESS 10000000000
+
+# Transfer to ADMIN
+cast send --rpc-url $RPC_URL --from $USDC_WHALE --unlocked $USDC "transfer(address,uint256)" $ADMIN_ADDRESS 10000000000
+
+# Stop impersonation
+cast rpc --rpc-url $RPC_URL anvil_stopImpersonatingAccount $USDC_WHALE
 
 # 测试用例2: 设置初始配置
 echo "📋 Test Case 2: 设置初始配置"
@@ -92,14 +103,12 @@ MAX_RAISING=5000000000   # 5000 USDC
 CURRENT_TIMESTAMP=$(cast block --rpc-url $RPC_URL latest --field timestamp)
 ACCRUAL_START=$(($CURRENT_TIMESTAMP + 3600))  # 1 hour in future
 ACCRUAL_END=$(($ACCRUAL_START + 31536000))  # +1 year
-FEE_BPS=0
 LANDLORD=$ADMIN_ADDRESS
 DOC_HASH=0x0000000000000000000000000000000000000000000000000000000000000000
-CITY="TestCity"
 OFFCHAIN_URL="http://example.com"
 
 # Encode the struct for addOrUpdateProperty
-cast send $PROPERTY_ORACLE "addOrUpdateProperty(uint256,(uint256,address,uint256,uint256,uint256,uint64,uint64,uint16,address,bytes32,string,string))" $PROPERTY_ID "($PROPERTY_ID,$PAYOUT_TOKEN,$VALUATION,$MIN_RAISING,$MAX_RAISING,$ACCRUAL_START,$ACCRUAL_END,$FEE_BPS,$LANDLORD,$DOC_HASH,$CITY,$OFFCHAIN_URL)" --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY || { echo "❌ Failed to add property"; exit 1; }
+cast send $PROPERTY_ORACLE "addOrUpdateProperty(uint256,(uint256,address,uint256,uint256,uint256,uint64,uint64,address,bytes32,string))" $PROPERTY_ID "($PROPERTY_ID,$PAYOUT_TOKEN,$VALUATION,$MIN_RAISING,$MAX_RAISING,$ACCRUAL_START,$ACCRUAL_END,$LANDLORD,$DOC_HASH,$OFFCHAIN_URL)" --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY || { echo "❌ Failed to add property"; exit 1; }
 
 echo "✅ Test property added"
 
@@ -136,7 +145,7 @@ echo "Admin KYC status: $IS_ADMIN_KYC"
 
 # 验证 Sanction Oracle 初始状态
 echo "🔍 Checking Sanction Oracle initial state..."
-IS_ADMIN_SANCTIONED=$(cast call $SANCTION_ORACLE "isBlocked(address)(bool)" $ADMIN_ADDRESS --rpc-url $RPC_URL)
+IS_ADMIN_SANCTIONED=$(cast call $SANCTION_ORACLE "isSanctioned(address)(bool)" $ADMIN_ADDRESS --rpc-url $RPC_URL)
 echo "Admin sanction status: $IS_ADMIN_SANCTIONED"
 
 # 检查代币名称和符号

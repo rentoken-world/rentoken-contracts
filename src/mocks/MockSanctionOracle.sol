@@ -6,7 +6,7 @@ import "../interfaces/ISanctionOracle.sol";
 contract MockSanctionOracle is ISanctionOracle {
     mapping(address => bool) private _blocked;
 
-    function isBlocked(address addr) external view override returns (bool) {
+    function isSanctioned(address addr) external view returns (bool) {
         return _blocked[addr];
     }
 

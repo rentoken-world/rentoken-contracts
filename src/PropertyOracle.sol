@@ -10,18 +10,16 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
  */
 contract PropertyOracle is Ownable, Pausable {
     struct PropertyData {
-        uint256 propertyId;        // 资产ID
-        address payoutToken;       // 分红/募集币种(如 USDC)
-        uint256 valuation;         // 估值(未来现金流折现)
-        uint256 minRaising;        // 最小募集额(USDC)
-        uint256 maxRaising;        // 最大募集额(USDC)
-        uint64  accrualStart;      // 起息(Unix time)
-        uint64  accrualEnd;        // 止息(Unix time)
-        uint16  feeBps;            // 平台费,基点（本版净额已在链下扣除，可设 0 或忽略）
-        address landlord;          // 房东/收益权所有者
-        bytes32 docHash;           // 线下材料的内容哈希(如 IPFS 文件的 keccak256)
-        string  city;              // 城市(可选,字符串要谨慎,Gas 贵)
-        string  offchainURL;       // 资料URL(可选)
+        uint256 propertyId; // 资产ID
+        address payoutToken; // 分红/募集币种(如 USDC)
+        uint256 valuation; // 估值(未来现金流折现)
+        uint256 minRaising; // 最小募集额(USDC)
+        uint256 maxRaising; // 最大募集额(USDC)
+        uint64 accrualStart; // 起息(Unix time)
+        uint64 accrualEnd; // 止息(Unix time)
+        address landlord; // 房东/收益权所有者
+        bytes32 docHash; // 线下材料的内容哈希(如 IPFS 文件的 keccak256)
+        string offchainURL; // 资料URL(可选)
     }
 
     // Mapping from propertyId to PropertyData
