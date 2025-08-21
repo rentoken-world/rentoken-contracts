@@ -143,3 +143,29 @@
       支持 IKYCOracle.isWhitelisted(addr)返回bool表示是否是白名单，非EOA地址经过验证后也可以加入。
     AMML流动性池合约:
       功能: 支持我们的kyc要求的流动性池子。具体方式是采用质押还是uniswap待定。暂时不放在本版本里。
+
+modules:
+  - name: KycPool
+    file: contracts/pool/KycPool.sol
+    purpose: KYC版 Uniswap v2 常数乘积池，交易对 RTN/USDC（6位小数）
+    deps: [KYCOracle(isWhitelisted)]
+    settings:
+      feeBps: 30 # 0.3%，可在0–100范围调整
+      lp_shares: non-transferable # 内部记账，不发行可转LP
+      isOpen: controlled by admin # 运行期开关
+    api:
+      - addLiquidity(amtRTN, amtUSDC, minShares, deadline)
+      - removeLiquidity(shares, minRTN, minUSDC, deadline)
+      - swapExactRTNForUSDC(amtIn, minOut, to, deadline)
+      - swapExactUSDCForRTN(amtIn, minOut, to, deadline)
+      - getReserves(), getPriceRTNinUSDC(), getPriceUSDCinRTN(), quote(), getAmountOut(), getAmountIn()
+
+  - name: KycPoolFactory
+    file: contracts/pool/KycPoolFactory.sol
+    purpose: 为 propertyId 创建并管理唯一 KycPool
+    api:
+      - createPool(propertyId, rtk, usdc, feeBps) -> pool [admin]
+      - openTrading(propertyId) / closeTrading(propertyId) [admin]
+    mapping:
+      - poolOf[propertyId] -> poolAddress
+    notes: 池地址加入白名单由外部调用 KYCOracle 管理接口完成
