@@ -80,6 +80,7 @@
         - claim: |
           用户操作,触发将当前可用分红更新进入个人的claimable参数的作用,刷新debt 和claimable
           尝试将用户名下claimable的erc20资金额度转入用户的地址下
+          claim 要可以带个数额参数，不带参数的时候，默认提取最大额度，带了参数会按照参数执行（参数大于claimable会失败）
         - 其他erc20的标准操作,不过加入两点:
           - 如果操作会更改用户的amount,那么要提取所有未分配利润进入claimable,然后再根据当前的acc更新amount和debt
           - 除了只读操作外,操作要对收发方都做kyc和sanction验证,考虑用一个modifier去做。

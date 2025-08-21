@@ -182,6 +182,146 @@ contract RentTokenTest is Test {
         assertEq(balanceAfter - balanceBefore, profitAmount);
     }
 
+    function test_ClaimWithAmount() public {
+        // Setup: User contributes and receives profit
+        uint256 contributionAmount = 50_000 * 1e6;
+        vm.prank(user1);
+        usdc.approve(address(rentToken), contributionAmount);
+        vm.prank(user1);
+        rentToken.contribute(contributionAmount);
+
+        // Fast forward to accrual phase
+        vm.warp(accrualStart + 1);
+
+        // Distribute profit
+        uint256 profitAmount = 10_000 * 1e6;
+        vm.prank(admin);
+        usdc.mint(factory, profitAmount);
+        vm.prank(factory);
+        usdc.approve(address(rentToken), profitAmount);
+        vm.prank(factory);
+        rentToken.receiveProfit(profitAmount);
+
+        // Test claiming specific amount
+        uint256 claimAmount = 3_000 * 1e6;
+        uint256 balanceBefore = usdc.balanceOf(user1);
+        uint256 claimableBefore = rentToken.getClaimableAmount(user1);
+
+        vm.prank(user1);
+        rentToken.claim(claimAmount);
+
+        uint256 balanceAfter = usdc.balanceOf(user1);
+        uint256 claimableAfter = rentToken.getClaimableAmount(user1);
+
+        assertEq(balanceAfter - balanceBefore, claimAmount);
+        assertEq(claimableAfter, claimableBefore - claimAmount);
+
+        // Test claiming remaining amount
+        vm.prank(user1);
+        rentToken.claim(0); // Claim all remaining
+
+        assertEq(rentToken.getClaimableAmount(user1), 0);
+    }
+
+    function test_ClaimAmountExceedsClaimable() public {
+        // Setup: User contributes and receives profit
+        uint256 contributionAmount = 50_000 * 1e6;
+        vm.prank(user1);
+        usdc.approve(address(rentToken), contributionAmount);
+        vm.prank(user1);
+        rentToken.contribute(contributionAmount);
+
+        // Fast forward to accrual phase
+        vm.warp(accrualStart + 1);
+
+        // Distribute profit
+        uint256 profitAmount = 10_000 * 1e6;
+        vm.prank(admin);
+        usdc.mint(factory, profitAmount);
+        vm.prank(factory);
+        usdc.approve(address(rentToken), profitAmount);
+        vm.prank(factory);
+        rentToken.receiveProfit(profitAmount);
+
+        // Try to claim more than available
+        uint256 claimableAmount = rentToken.getClaimableAmount(user1);
+        uint256 excessiveAmount = claimableAmount + 1000 * 1e6;
+
+        vm.prank(user1);
+        vm.expectRevert("RentToken: Amount exceeds claimable");
+        rentToken.claim(excessiveAmount);
+    }
+
+        function test_ClaimZeroAmount() public {
+        // Setup: User contributes and receives profit
+        uint256 contributionAmount = 50_000 * 1e6;
+        vm.prank(user1);
+        usdc.approve(address(rentToken), contributionAmount);
+        vm.prank(user1);
+        rentToken.contribute(contributionAmount);
+
+        // Fast forward to accrual phase
+        vm.warp(accrualStart + 1);
+
+        // Distribute profit
+        uint256 profitAmount = 10_000 * 1e6;
+        vm.prank(admin);
+        usdc.mint(factory, profitAmount);
+        vm.prank(admin);
+        usdc.mint(factory, profitAmount);
+        vm.prank(factory);
+        usdc.approve(address(rentToken), profitAmount);
+        vm.prank(factory);
+        rentToken.receiveProfit(profitAmount);
+
+        // Claim with zero amount (should claim all)
+        uint256 balanceBefore = usdc.balanceOf(user1);
+        uint256 claimableBefore = rentToken.getClaimableAmount(user1);
+
+        vm.prank(user1);
+        rentToken.claim(0);
+
+        uint256 balanceAfter = usdc.balanceOf(user1);
+        uint256 claimableAfter = rentToken.getClaimableAmount(user1);
+
+        assertEq(balanceAfter - balanceBefore, claimableBefore);
+        assertEq(claimableAfter, 0);
+    }
+
+    function test_ClaimNoParameter() public {
+        // Setup: User contributes and receives profit
+        uint256 contributionAmount = 50_000 * 1e6;
+        vm.prank(user1);
+        usdc.approve(address(rentToken), contributionAmount);
+        vm.prank(user1);
+        rentToken.contribute(contributionAmount);
+
+        // Fast forward to accrual phase
+        vm.warp(accrualStart + 1);
+
+        // Distribute profit
+        uint256 profitAmount = 10_000 * 1e6;
+        vm.prank(admin);
+        usdc.mint(factory, profitAmount);
+        vm.prank(factory);
+        usdc.approve(address(rentToken), profitAmount);
+        vm.prank(factory);
+        rentToken.receiveProfit(profitAmount);
+
+        // Test claiming without parameter (should claim all)
+        uint256 balanceBefore = usdc.balanceOf(user1);
+        uint256 claimableBefore = rentToken.getClaimableAmount(user1);
+
+        vm.prank(user1);
+        rentToken.claim(); // No parameter
+
+        uint256 balanceAfter = usdc.balanceOf(user1);
+        uint256 claimableAfter = rentToken.getClaimableAmount(user1);
+
+        assertEq(balanceAfter - balanceBefore, claimableBefore);
+        assertEq(claimableAfter, 0);
+    }
+
     function testFuzz_Contribute(uint256 amount) public {
         vm.assume(amount > 0 && amount <= MAX_RAISING);
 
