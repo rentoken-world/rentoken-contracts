@@ -142,16 +142,16 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
                 return Phase.RisingFailed;
             }
         } else if (block.timestamp >= accrualEnd) {
+            // Check if terminated (180 days after end)
+            if (block.timestamp >= accrualEnd + 180 days) {
+                return Phase.Terminated;
+            }
+            
             if (totalFundRaised >= minRaising) {
                 return Phase.AccrualFinished;
             } else {
                 return Phase.RisingFailed;
             }
-        }
-
-        // Check if terminated (180 days after end)
-        if (block.timestamp >= accrualEnd + 180 days) {
-            return Phase.Terminated;
         }
 
         return Phase.AccrualFinished;
@@ -160,12 +160,13 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
     /**
      * @dev Contribute USDC to get RTN tokens (only in fundraising phase)
      */
-    function contribute(uint256 amount) external onlyInPhase(Phase.Fundraising) updateReward(msg.sender) {
-        // Check KYC for contributor only
-        require(IKYC(kycOracle).isWhitelisted(msg.sender), "RentToken: Contributor not KYC verified");
-        require(!ISanctionOracle(sanctionOracle).isSanctioned(msg.sender), "RentToken: Contributor is sanctioned");
+    function contribute(uint256 amount) external onlyInPhase(Phase.Fundraising) updateReward(msg.sender) whenNotPaused {
         require(amount > 0, "RentToken: Amount must be positive");
         require(totalFundRaised + amount <= maxRaising, "RentToken: Exceeds max raising");
+        
+        // KYC and sanction checks
+        require(IKYC(kycOracle).isWhitelisted(msg.sender), "RentToken: Contributor not KYC verified");
+        require(!ISanctionOracle(sanctionOracle).isSanctioned(msg.sender), "RentToken: Contributor is sanctioned");
 
         // Transfer USDC from user
         IERC20(payoutToken).safeTransferFrom(msg.sender, address(this), amount);
