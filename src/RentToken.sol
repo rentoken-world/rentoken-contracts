@@ -195,18 +195,44 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
     }
 
     /**
-     * @dev Claim accumulated profits
+     * @dev Claim all accumulated profits
      */
     function claim() external updateReward(msg.sender) {
-        uint256 amount = claimable[msg.sender];
-        require(amount > 0, "RentToken: No profits to claim");
+        uint256 availableAmount = claimable[msg.sender];
+        require(availableAmount > 0, "RentToken: No profits to claim");
 
         claimable[msg.sender] = 0;
 
         // Transfer USDC to user
-        IERC20(payoutToken).safeTransfer(msg.sender, amount);
+        IERC20(payoutToken).safeTransfer(msg.sender, availableAmount);
 
-        emit ProfitClaimed(msg.sender, amount);
+        emit ProfitClaimed(msg.sender, availableAmount);
+    }
+
+    /**
+     * @dev Claim specific amount of accumulated profits
+     * @param amount Amount to claim (0 for maximum available)
+     */
+    function claim(uint256 amount) external updateReward(msg.sender) {
+        uint256 availableAmount = claimable[msg.sender];
+        require(availableAmount > 0, "RentToken: No profits to claim");
+
+        uint256 claimAmount;
+        if (amount == 0) {
+            // Claim maximum available amount
+            claimAmount = availableAmount;
+        } else {
+            // Claim specified amount
+            require(amount <= availableAmount, "RentToken: Amount exceeds claimable");
+            claimAmount = amount;
+        }
+
+        claimable[msg.sender] = availableAmount - claimAmount;
+
+        // Transfer USDC to user
+        IERC20(payoutToken).safeTransfer(msg.sender, claimAmount);
+
+        emit ProfitClaimed(msg.sender, claimAmount);
     }
 
     /**
