@@ -50,10 +50,8 @@ contract EdgeCasesTest is Test {
             maxRaising: 800_000 * 1e6,
             accrualStart: uint64(block.timestamp + 86400),
             accrualEnd: uint64(block.timestamp + 86400 * 365),
-            feeBps: 1000,
             landlord: landlord,
             docHash: keccak256("test"),
-            city: "Test City",
             offchainURL: "https://test.com"
         });
         

@@ -33,10 +33,8 @@ contract PropertyOracleTest is Test {
             maxRaising: 800_000 * 1e6,  // 800K USDC
             accrualStart: uint64(block.timestamp + 1 days),
             accrualEnd: uint64(block.timestamp + 365 days),
-            feeBps: 500, // 5%
             landlord: makeAddr("landlord"),
             docHash: keccak256("property_documents"),
-            city: "Amsterdam",
             offchainURL: "https://ipfs.io/ipfs/QmTest"
         });
     }
@@ -60,7 +58,6 @@ contract PropertyOracleTest is Test {
         assertEq(data.minRaising, 100_000 * 1e6);
         assertEq(data.maxRaising, 800_000 * 1e6);
         assertEq(data.landlord, testProperty.landlord);
-        assertEq(data.city, "Amsterdam");
         assertEq(version, 1);
         
         // Check version tracking

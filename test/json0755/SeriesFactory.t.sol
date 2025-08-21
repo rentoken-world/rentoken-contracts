@@ -53,10 +53,8 @@ contract SeriesFactoryTest is Test {
             maxRaising: 800_000 * 1e6,
             accrualStart: uint64(block.timestamp + 1 days),
             accrualEnd: uint64(block.timestamp + 365 days),
-            feeBps: 500,
             landlord: landlord,
             docHash: keccak256("property_docs"),
-            city: "Amsterdam",
             offchainURL: "https://ipfs.io/ipfs/QmTest"
         });
         

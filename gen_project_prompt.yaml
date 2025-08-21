@@ -142,9 +142,6 @@
       功能: 链下完成kyc认证以后，由kycoracle的admin去上传用户的地址进入kycOracle合约，自己部署
       支持 IKYCOracle.isWhitelisted(addr)返回bool表示是否是白名单，非EOA地址经过验证后也可以加入。
     AMML流动性池合约:
-<<<<<<< HEAD
-      功能: 支持我们的kyc要求的流动性池子。具体方式是采用质押还是uniswap待定。暂时不放在本版本里。
-=======
       功能: 支持我们的kyc要求的流动性池子。具体方式是采用质押还是uniswap待定。暂时不放在本版本里。
 
 modules:
@@ -172,4 +169,3 @@ modules:
     mapping:
       - poolOf[propertyId] -> poolAddress
     notes: 池地址加入白名单由外部调用 KYCOracle 管理接口完成
->>>>>>> main

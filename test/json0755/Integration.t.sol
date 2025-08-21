@@ -61,10 +61,8 @@ contract IntegrationTest is Test {
             maxRaising: 800_000 * 1e6,
             accrualStart: uint64(block.timestamp + 7 days),
             accrualEnd: uint64(block.timestamp + 365 days),
-            feeBps: 500,
             landlord: landlord1,
             docHash: keccak256("property1_docs"),
-            city: "Amsterdam",
             offchainURL: "https://ipfs.io/ipfs/QmProperty1"
         });
         
@@ -76,10 +74,8 @@ contract IntegrationTest is Test {
             maxRaising: 1_600_000 * 1e6,
             accrualStart: uint64(block.timestamp + 14 days),
             accrualEnd: uint64(block.timestamp + 730 days),
-            feeBps: 400,
             landlord: landlord2,
             docHash: keccak256("property2_docs"),
-            city: "Berlin",
             offchainURL: "https://ipfs.io/ipfs/QmProperty2"
         });
         
@@ -288,13 +284,28 @@ contract IntegrationTest is Test {
         assertEq(series.balanceOf(investor1), investment - transferAmount);
         assertEq(series.balanceOf(investor2), transferAmount);
         
-        // Both should be able to claim proportional profits
+        // After transfer, investor1 should have all the previous profits
+        // investor2 should have 0 claimable (no profits earned yet)
         uint256 claimable1 = series.getClaimableAmount(investor1);
         uint256 claimable2 = series.getClaimableAmount(investor2);
         
         assertGt(claimable1, 0);
+        assertEq(claimable2, 0); // investor2 hasn't earned any profits yet
+        
+        // Distribute new profit after transfer
+        vm.startPrank(operator);
+        usdc.approve(address(factory), 2500 * 1e6);
+        factory.receiveProfit(PROPERTY_ID_1, 2500 * 1e6);
+        vm.stopPrank();
+        
+        // Now both should have claimable amounts based on their current holdings
+        claimable1 = series.getClaimableAmount(investor1);
+        claimable2 = series.getClaimableAmount(investor2);
+        
+        assertGt(claimable1, 0);
         assertGt(claimable2, 0);
-        assertEq(claimable1 + claimable2, 7500 * 1e6); // Total profit (5000 + 2500)
+        // New profit should be split proportionally: 1250 each (50% each)
+        assertEq(claimable2, 1250 * 1e6);
     }
     
     function test_KYCAndSanctionIntegration() public {

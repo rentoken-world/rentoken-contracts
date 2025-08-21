@@ -312,8 +312,6 @@ contract RentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, Pausa
      */
     function getClaimableAmount(address account) external view returns (uint256) {
         uint256 reward = (balanceOf(account) * accumulatedRewardPerToken / 1e18) - debt[account];
-        // uint256 totalReward = balanceOf(account) * accumulatedRewardPerToken / 1e18;
-        // uint256 reward = totalReward > debt[account] ? totalReward - debt[account] : 0;
         return claimable[account] + reward;
     }
 
