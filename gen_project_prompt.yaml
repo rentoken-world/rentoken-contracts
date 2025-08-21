@@ -104,6 +104,9 @@
         - refund:
           - 仅在 risingFailed 阶段可调用；按用户当前 amount 作为 USDC 退款基准退款，并将其 amount 减少相同数量（或销毁对应 RTN）
           - 退款后更新 totalFundRaised、用户 debt/claimable 等相关会计参数，避免遗留分红状态
+        - setStartTime:
+          - 在一定情况下，允许admin去设置合约的accrualStart状态:
+            - 当前fundrising，管理员可以修改accrualStart 为当前+0.01秒.这样可以几乎马上开始判断是否发售成功。但是其他状态下，不允许修改。
       - 计算利益分配的原理: |
         在传统的erc20 之上,每个用户信息里有三个信息,amount,debt,claimable。
         amount是用户当前持有代币的数量。
@@ -169,3 +172,6 @@ modules:
     mapping:
       - poolOf[propertyId] -> poolAddress
     notes: 池地址加入白名单由外部调用 KYCOracle 管理接口完成
+scripts:
+  - init-local.sh: 当anvil 以fork现网的方式运行之后，运行这个脚本以部署和初始化我们的平台，以及测试用户。
+  - setup_for_web.sh: 把预设的5套房产输入oracle，3套在发售中，1套运行中（需要先做够投资，然后用admin去setStartTime）

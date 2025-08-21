@@ -70,7 +70,8 @@ contract RentTokenTest is Test {
         // Clone as proxy
         address proxy = Clones.clone(rentTokenImpl);
 
-        // Initialize the proxy
+        // Initialize the proxy with admin as msg.sender
+        vm.prank(admin);
         RentToken(proxy).initialize(
             "RenToken Test",
             "RTT",
@@ -192,6 +193,72 @@ contract RentTokenTest is Test {
 
         assertEq(rentToken.balanceOf(user1), amount);
         assertEq(rentToken.totalFundRaised(), amount);
+    }
+
+    function testSetStartTime() public {
+        // Should be in fundraising phase initially
+        assertEq(uint256(rentToken.getPhase()), uint256(RentToken.Phase.Fundraising));
+
+        uint64 originalStartTime = rentToken.accrualStart();
+
+        // Only admin can call setStartTime
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", user1));
+        rentToken.setStartTime();
+
+        // Admin can call setStartTime in fundraising phase
+        vm.prank(admin);
+        rentToken.setStartTime();
+
+        uint64 newStartTime = rentToken.accrualStart();
+        // The new start time should be different from the original
+        assertTrue(newStartTime != originalStartTime);
+        // The new start time should be close to current block.timestamp + 1
+        assertLe(newStartTime, block.timestamp + 2); // Should be current time + 1 second
+
+        // Should still be in fundraising phase since we haven't reached the new start time
+        assertEq(uint256(rentToken.getPhase()), uint256(RentToken.Phase.Fundraising));
+    }
+
+    function testSetStartTimeOnlyInFundraising() public {
+        // Add enough contributions to reach minRaising first
+        uint256 contributionAmount = MIN_RAISING;
+
+        vm.prank(user1);
+        usdc.approve(address(rentToken), contributionAmount);
+        vm.prank(user1);
+        rentToken.contribute(contributionAmount);
+
+        // Fast forward to after accrual start time
+        vm.warp(accrualStart + 1);
+
+        // Should be in AccrualStarted phase now
+        assertEq(uint256(rentToken.getPhase()), uint256(RentToken.Phase.AccrualStarted));
+
+        // Admin cannot call setStartTime in non-fundraising phase
+        vm.prank(admin);
+        vm.expectRevert("RentToken: Wrong phase");
+        rentToken.setStartTime();
+    }
+
+    function testSetStartTimeEmitsPhaseChangeEvent() public {
+        // Add enough contributions to reach minRaising
+        uint256 contributionAmount = MIN_RAISING;
+
+        vm.prank(user1);
+        usdc.approve(address(rentToken), contributionAmount);
+        vm.prank(user1);
+        rentToken.contribute(contributionAmount);
+
+        // Set start time to trigger phase change
+        vm.prank(admin);
+        rentToken.setStartTime();
+
+        // Fast forward to after the new start time
+        vm.warp(rentToken.accrualStart() + 1);
+
+        // Should now be in AccrualStarted phase
+        assertEq(uint256(rentToken.getPhase()), uint256(RentToken.Phase.AccrualStarted));
     }
 
     // Add more tests as needed
