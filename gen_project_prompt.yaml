@@ -44,6 +44,12 @@
           - 资金: 使用 payoutToken.safeTransferFrom(msg.sender, series, amount) 转入净额
           - 调用: 随后调用 series.receiveProfit(amount)
           - 事件: 触发 ProfitForwarded(propertyId, series, amount, msg.sender)
+        - startSeriesNow:
+          - 参数，propertyID
+          - 权限，仅 operator/admin
+          - 路由: 基于 propertyId 定位 series 合约；若不存在映射则拒绝
+          - 任务: 先查询到对应Series到合约地址，然后以SeriesFactory的身份去呼叫erc20 series合约的setStartTime()方法，无参数
+            setStartTime 方法会检查msg.sender 是否是自己的owner，而工厂合约是每个series的owner
       - 关于发行erc20合约的逻辑:
         需要采用代理合约，也就是每一个erc20合约都是保存数据，然后借用一个implementation合约实现逻辑。
     RT*** 代币合约:
