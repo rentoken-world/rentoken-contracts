@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# KYC Oracle合约地址
+KYC_ORACLE="0x14A0639E7f3225618469191E09D5dcC566Ce954c"
+
+# 要添加到白名单的地址数组
+ADDRESSES=(
+    "0xE991bC71A371055B3f02aa79b79E4b714A3D04c0"
+    "0x4DaA04d0B4316eCC9191Ae07102eC08Bded637a2"
+    "0xf0E1C276407DD69D2a776bb82894160Cf3B25eB3"
+    "0x3F67ECcD86D802355046909Ffc68308dA0969EC7"
+    "0xCe8dDFb00773162A020b95Ffb4Cf067b3A61b99c"
+    "0x64078503e9d53b0d9e6CE2B04DBCe8BCF8dc5ee2"
+    "0x302919D2A33C48e2bC82dE4077A5427a3Ef7E685"
+    "0xcC44277d1d6eC279Cd81e23111B1701758A3f82F"
+)
+
+RPC_URL="https://eth-sepolia.public.blastapi.io"
+
+for add in "${ADDRESSES[@]}"; do
+    cast send $KYC_ORACLE "addToWhitelist(address)" $add --rpc-url $RPC_URL --account myMetaMaskAcc --password ''
+done
