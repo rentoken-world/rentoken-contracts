@@ -25,7 +25,6 @@ echo "RPC_URL=$RPC_URL" >> $ENV_FILE
 echo "CHAIN_ID=$CHAIN_ID" >> $ENV_FILE
 echo "" >> $ENV_FILE
 echo "# Etherscan Configuration" >> $ENV_FILE
-echo "ETHERSCAN_API_KEY=$ETHERSCAN_API_KEY" >> $ENV_FILE
 
 echo "Deploying contracts to Sepolia..."
 
@@ -128,7 +127,6 @@ echo "🔧 Or use them in forge scripts with: vm.envString('VARIABLE_NAME')"
 echo ""
 echo "📋 Generated .env file structure:"
 echo "   - RPC configuration for Sepolia"
-echo "   - Etherscan API key configuration"
 echo "   - Contract addresses"
 echo "   - Mock USDC address on Sepolia"
 echo ""
