@@ -127,6 +127,10 @@ echo "🔧 Or use them in forge scripts with: vm.envString('VARIABLE_NAME')"
 echo ""
 echo "📋 Generated .env file structure:"
 echo "   - RPC configuration for Sepolia"
+<<<<<<< HEAD
+=======
+echo "   - Etherscan API key configuration"
+>>>>>>> 53a49b9 (update script to sepolia)
 echo "   - Contract addresses"
 echo "   - Mock USDC address on Sepolia"
 echo ""
