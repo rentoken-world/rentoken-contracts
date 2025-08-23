@@ -11,19 +11,19 @@ import "./KycPool.sol";
  * @dev Factory for creating unique KYC pools per propertyId
  */
 contract KycPoolFactory is AccessControl {
-    
+
     // Oracle
     IKYCOracle public kyc;
-    
+
     // Mapping from propertyId to pool address
     mapping(uint256 => address) public poolOf;
-    
+
     // Events
     event PoolCreated(
-        uint256 indexed propertyId, 
-        address pool, 
-        address rtk, 
-        address usdc, 
+        uint256 indexed propertyId,
+        address pool,
+        address rtk,
+        address usdc,
         uint16 feeBps
     );
 
@@ -35,7 +35,7 @@ contract KycPoolFactory is AccessControl {
     constructor(address _kycOracle, address _admin) {
         require(_kycOracle != address(0), "INVALID_KYC_ORACLE");
         require(_admin != address(0), "INVALID_ADMIN");
-        
+
         kyc = IKYCOracle(_kycOracle);
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
     }
@@ -57,19 +57,19 @@ contract KycPoolFactory is AccessControl {
         require(poolOf[propertyId] == address(0), "POOL_EXISTS");
         require(rtk != address(0), "INVALID_RTK");
         require(usdc != address(0), "INVALID_USDC");
-        
-        // Deploy new KycPool  
+
+        // Deploy new KycPool
         pool = address(new KycPool(
             rtk,
-            usdc, 
+            usdc,
             address(kyc),
             feeBps,
             msg.sender // admin of the pool (should be the factory admin)
         ));
-        
+
         // Record mapping
         poolOf[propertyId] = pool;
-        
+
         emit PoolCreated(propertyId, pool, rtk, usdc, feeBps);
     }
 
@@ -80,18 +80,18 @@ contract KycPoolFactory is AccessControl {
     function openTrading(uint256 propertyId) external onlyRole(DEFAULT_ADMIN_ROLE) {
         address pool = poolOf[propertyId];
         require(pool != address(0), "POOL_NOT_EXISTS");
-        
+
         KycPool(pool).openTrading();
     }
 
     /**
      * @dev Close trading for a specific pool
-     * @param propertyId The property ID  
+     * @param propertyId The property ID
      */
     function closeTrading(uint256 propertyId) external onlyRole(DEFAULT_ADMIN_ROLE) {
         address pool = poolOf[propertyId];
         require(pool != address(0), "POOL_NOT_EXISTS");
-        
+
         KycPool(pool).closeTrading();
     }
 
