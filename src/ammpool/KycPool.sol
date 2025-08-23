@@ -63,7 +63,7 @@ contract KycPool is AccessControl, Pausable, ReentrancyGuard {
     /**
      * @dev Constructor
      * @param _rtk RTN token address
-     * @param _usdc USDC token address  
+     * @param _usdc USDC token address
      * @param _kycOracle KYC Oracle address
      * @param _feeBps Fee in basis points (0-100)
      * @param _admin Admin address
@@ -160,12 +160,12 @@ contract KycPool is AccessControl, Pausable, ReentrancyGuard {
     /**
      * @dev Get amount out for exact input with fees
      */
-    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) 
-        public view returns (uint256 amountOut) 
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
+        public view returns (uint256 amountOut)
     {
         require(amountIn > 0, "INSUFFICIENT_INPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
-        
+
         uint256 amountInWithFee = amountIn * (10000 - feeBps) / 10000;
         uint256 numerator = amountInWithFee * reserveOut;
         uint256 denominator = reserveIn + amountInWithFee;
@@ -181,7 +181,7 @@ contract KycPool is AccessControl, Pausable, ReentrancyGuard {
         require(amountOut > 0, "INSUFFICIENT_OUTPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "INSUFFICIENT_LIQUIDITY");
         require(amountOut < reserveOut, "INSUFFICIENT_LIQUIDITY");
-        
+
         uint256 numerator = reserveIn * amountOut * 10000;
         uint256 denominator = (reserveOut - amountOut) * (10000 - feeBps);
         amountIn = (numerator / denominator) + 1;
@@ -217,7 +217,7 @@ contract KycPool is AccessControl, Pausable, ReentrancyGuard {
             // First liquidity addition
             newShares = _sqrt(amtRTN * amtUSDC) - MIN_LIQUIDITY;
             require(newShares > 0, "INSUFFICIENT_LIQUIDITY_MINTED");
-            
+
             // Lock minimum liquidity
             shares[address(0)] = MIN_LIQUIDITY;
             totalShares = newShares + MIN_LIQUIDITY;
@@ -225,18 +225,18 @@ contract KycPool is AccessControl, Pausable, ReentrancyGuard {
             // Subsequent additions
             uint256 _reserveRTN = uint256(reserveRTN);
             uint256 _reserveUSDC = uint256(reserveUSDC);
-            
+
             uint256 sharesFromRTN = (amtRTN * _totalShares) / _reserveRTN;
             uint256 sharesFromUSDC = (amtUSDC * _totalShares) / _reserveUSDC;
-            
+
             newShares = sharesFromRTN < sharesFromUSDC ? sharesFromRTN : sharesFromUSDC;
             require(newShares > 0, "INSUFFICIENT_LIQUIDITY_MINTED");
-            
+
             totalShares = _totalShares + newShares;
         }
 
         require(newShares >= minShares, "SLIPPAGE");
-        
+
         shares[msg.sender] += newShares;
         _syncReserves();
 
@@ -308,7 +308,7 @@ contract KycPool is AccessControl, Pausable, ReentrancyGuard {
 
         uint256 _reserveRTN = uint256(reserveRTN);
         uint256 _reserveUSDC = uint256(reserveUSDC);
-        
+
         outUSDC = getAmountOut(amtIn, _reserveRTN, _reserveUSDC);
         require(outUSDC >= minOut, "SLIPPAGE");
 
@@ -343,7 +343,7 @@ contract KycPool is AccessControl, Pausable, ReentrancyGuard {
 
         uint256 _reserveRTN = uint256(reserveRTN);
         uint256 _reserveUSDC = uint256(reserveUSDC);
-        
+
         outRTN = getAmountOut(amtIn, _reserveUSDC, _reserveRTN);
         require(outRTN >= minOut, "SLIPPAGE");
 
@@ -403,13 +403,13 @@ contract KycPool is AccessControl, Pausable, ReentrancyGuard {
     function _syncReserves() private {
         uint256 balanceRTN = IERC20(rtk).balanceOf(address(this));
         uint256 balanceUSDC = IERC20(usdc).balanceOf(address(this));
-        
+
         require(balanceRTN <= type(uint112).max && balanceUSDC <= type(uint112).max, "OVERFLOW");
-        
+
         reserveRTN = uint112(balanceRTN);
         reserveUSDC = uint112(balanceUSDC);
         blockTimestampLast = uint32(block.timestamp);
-        
+
         emit PoolSynced(reserveRTN, reserveUSDC);
     }
 

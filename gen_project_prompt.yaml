@@ -156,7 +156,7 @@
 
 modules:
   - name: KycPool
-    file: contracts/pool/KycPool.sol
+    file: src/ammpool/KycPool.sol
     purpose: KYC版 Uniswap v2 常数乘积池，交易对 RTN/USDC（6位小数）
     deps: [KYCOracle(isWhitelisted)]
     settings:
@@ -171,7 +171,7 @@ modules:
       - getReserves(), getPriceRTNinUSDC(), getPriceUSDCinRTN(), quote(), getAmountOut(), getAmountIn()
 
   - name: KycPoolFactory
-    file: contracts/pool/KycPoolFactory.sol
+    file: src/ammpool/KycPoolFactory.sol
     purpose: 为 propertyId 创建并管理唯一 KycPool
     api:
       - createPool(propertyId, rtk, usdc, feeBps) -> pool [admin]
