@@ -6,7 +6,9 @@
 
 ## 项目概述
 
-Rentoken 是一个面向房产租金收益的 RWA（Real World Asset）协议，允许房东将未来 1-5 年的房租应收款上链，发行合规受限的 ERC20 Token。每个房产对应一个 ERC20 Token，房租定期打入合约，持有人可以随时提取利润。
+Rentoken 是一个面向房产租金收益的 RWA（Real World Asset）协议，允许房东将未来
+1-5 年的房租应收款上链，发行合规受限的 ERC20 Token。每个房产对应一个 ERC20
+Token，房租定期打入合约，持有人可以随时提取利润。
 
 ## 核心特性
 
@@ -21,7 +23,7 @@ Rentoken 是一个面向房产租金收益的 RWA（Real World Asset）协议，
 ### 核心合约
 
 - **SeriesFactory**: 平台控制入口，管理房产系列和资金路由
-- **RentToken**: ERC20 代币合约，支持收益分配和受限转账
+- **RentToken**: 基于ERC20 代币合约，支持发行流程控制，收益分配和受限转账
 - **PropertyOracle**: 房产信息 Oracle，提供链上房产数据
 - **KYCOracle**: KYC 白名单管理
 - **SanctionOracle**: 制裁地址检查
@@ -52,8 +54,6 @@ rentoken-contracts/
 │   ├── e2e_test_cases/   # 端到端测试用例
 │   └── KycPool.t.sol     # 流动性池测试
 ├── dev_scripts/          # 开发和部署脚本
-├── lib/                  # 外部依赖库
-└── docs/                 # 项目文档
 ```
 
 ## 快速开始
@@ -61,7 +61,6 @@ rentoken-contracts/
 ### 环境要求
 
 - [Foundry](https://getfoundry.sh/) (推荐最新版本)
-- Node.js 18+
 - Git
 
 ### 安装依赖
@@ -73,9 +72,6 @@ cd rentoken-contracts
 
 # 安装 Foundry 依赖
 forge install
-
-# 安装 Node.js 依赖（如果有）
-npm install
 ```
 
 ### 编译合约
@@ -95,10 +91,10 @@ forge test
 
 ```bash
 # 启动本地节点
-anvil
+anvil --fork <RPC>
 
 # 部署到本地网络
-forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
+
 ```
 
 ## 测试
@@ -148,7 +144,8 @@ forge script script/Deploy.s.sol --rpc-url $MAINNET_RPC --broadcast --verify
 
 ### 代码规范
 
-- 遵循 [Solidity Style Guide](https://docs.soliditylang.org/en/latest/style-guide.html)
+- 遵循
+  [Solidity Style Guide](https://docs.soliditylang.org/en/latest/style-guide.html)
 - 使用 `forge fmt` 自动格式化代码
 - 所有公开函数必须包含 NatSpec 注释
 - 使用自定义错误替代 require 字符串
@@ -170,7 +167,8 @@ forge script script/Deploy.s.sol --rpc-url $MAINNET_RPC --broadcast --verify
 
 - **[技术白皮书](rentoken_whitepaper.md)**: 详细的技术架构和业务逻辑说明
 - **[项目规范](.cursorrules)**: 开发规范和最佳实践
-- **[测试用例文档](test/e2e_test_cases/test_cases_documentation.md)**: 端到端测试用例说明
+- **[测试用例文档](test/e2e_test_cases/test_cases_documentation.md)**: 端到端测
+  试用例说明
 
 ## 贡献指南
 
@@ -198,9 +196,8 @@ forge script script/Deploy.s.sol --rpc-url $MAINNET_RPC --broadcast --verify
 
 ## 联系我们
 
-- 项目主页: [GitHub Repository]
-- 问题反馈: [GitHub Issues]
-- 技术讨论: [GitHub Discussions]
+- 项目主页: [https://github.com/rentoken-world/]
+- 问题反馈: [https://github.com/rentoken-world/rentoken-contracts/issues]
 
 ## 免责声明
 
@@ -208,4 +205,5 @@ forge script script/Deploy.s.sol --rpc-url $MAINNET_RPC --broadcast --verify
 
 ---
 
-**注意**: 这是一个金融协议，涉及真实资产和资金。在生产环境使用前，请确保充分理解相关风险，并咨询法律和金融专业人士。
+**注意**: 这是一个金融协议，涉及真实资产和资金。在生产环境使用前，请确保充分理解
+相关风险，并咨询法律和金融专业人士。
