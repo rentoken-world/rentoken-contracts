@@ -200,3 +200,58 @@ echo "   - USDC whale address for funding"
 echo ""
 echo "⚠️  Note: .env file is gitignored for security. Keep your private keys safe!"
 echo "💡 You can copy .env.example to .env and run this script to populate it."
+
+# === CLI 集成初始化 ===
+echo ""
+echo "🔧 CLI Integration Setup..."
+echo "=================================================="
+
+# 创建并更新 addresses JSON 文件
+ADDRESSES_FILE="addresses/${NETWORK:-mainnet-fork}.json"
+mkdir -p "addresses"
+
+# 使用 jq 更新地址文件
+cat > "$ADDRESSES_FILE" << EOF
+{
+  "KYCOracle": "$KYC_ORACLE_ADDR",
+  "PropertyOracle": "$PROPERTY_ORACLE_ADDR",
+  "SeriesFactory": "$SERIES_FACTORY_ADDR",
+  "RentTokenImpl": "$RENT_TOKEN_IMPL_ADDR",
+  "SanctionOracle": "$SANCTION_ORACLE_ADDR"
+}
+EOF
+
+echo "✅ Address file updated: $ADDRESSES_FILE"
+
+# 验证 CLI 工具
+if [[ -f "bin/rwa" ]]; then
+    echo "🔍 Verifying CLI tool..."
+    
+    # 测试基本命令
+    echo "   Testing addr:show command..."
+    ./bin/rwa addr:show ADMIN >/dev/null 2>&1 && echo "   ✅ addr:show working" || echo "   ❌ addr:show failed"
+    
+    echo "   Testing block:chainid command..."
+    ./bin/rwa block:chainid >/dev/null 2>&1 && echo "   ✅ block:chainid working" || echo "   ❌ block:chainid failed"
+    
+    echo "✅ CLI tool verified"
+else
+    echo "⚠️  CLI tool not found at bin/rwa"
+fi
+
+# 添加网络配置到 .env（如果不存在）
+if ! grep -q "NETWORK=" "$ENV_FILE"; then
+    echo "" >> "$ENV_FILE"
+    echo "# CLI Configuration" >> "$ENV_FILE"
+    echo "NETWORK=mainnet-fork" >> "$ENV_FILE"
+fi
+
+echo ""
+echo "🎯 CLI Quick Start:"
+echo "   Check ADMIN address:     ./bin/rwa addr:show ADMIN"
+echo "   Check KYC status:        ./bin/rwa kyc:check \$USER1_ADDRESS"
+echo "   Add user to KYC:         ./bin/rwa kyc:add USER1 --yes"
+echo "   Check USDC balance:      ./bin/rwa erc20:balance \$USDC_ADDR USER1"
+echo ""
+echo "📚 Full command list:      ./bin/rwa help"
+echo "📖 Documentation:          docs/CLI.md"

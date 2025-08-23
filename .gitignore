@@ -109,3 +109,9 @@ lib/
 # Hardhat
 hardhat.config.js
 hardhat.config.ts
+
+# RWA CLI 相关
+.secrets/
+*.keystore
+*.pem
+*.p12

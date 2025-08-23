@@ -1,0 +1,1105 @@
+#!/bin/bash
+
+# RWA CLI Tool - Real World Asset management CLI based on Foundry cast
+# Version: 1.0.0
+
+set -e
+
+# === 函数签名配置（可通过环境变量覆盖）===
+SIG_KYC_CHECK="${SIG_KYC_CHECK:-isWhitelisted(address)(bool)}"
+SIG_KYC_ADD="${SIG_KYC_ADD:-addToWhitelist(address)}"
+SIG_KYC_REMOVE="${SIG_KYC_REMOVE:-removeFromWhitelist(address)}"
+SIG_PROPERTY_ADD="${SIG_PROPERTY_ADD:-addOrUpdateProperty(uint256,(uint256,address,uint256,uint256,uint256,uint64,uint64,address,bytes32,string))}"
+SIG_SERIES_CREATE="${SIG_SERIES_CREATE:-createSeries(uint256,string,string)}"
+SIG_SERIES_ADDR_BY_ID="${SIG_SERIES_ADDR_BY_ID:-getSeriesAddress(uint256)(address)}"
+SIG_SERIES_SET_ORACLES="${SIG_SERIES_SET_ORACLES:-setOraclesForSeries(uint256,address,address)}"
+SIG_FACTORY_RECEIVE_PROFIT="${SIG_FACTORY_RECEIVE_PROFIT:-receiveProfit(uint256,uint256)}"
+
+# ERC20 标准函数签名
+SIG_ERC20_NAME="name()(string)"
+SIG_ERC20_SYMBOL="symbol()(string)"
+SIG_ERC20_DECIMALS="decimals()(uint8)"
+SIG_ERC20_TOTAL_SUPPLY="totalSupply()(uint256)"
+SIG_ERC20_BALANCE_OF="balanceOf(address)(uint256)"
+SIG_ERC20_TRANSFER="transfer(address,uint256)"
+SIG_ERC20_APPROVE="approve(address,uint256)"
+
+# RentToken 特殊函数签名
+SIG_RENT_GET_PHASE="getPhase()(uint8)"
+SIG_RENT_CLAIMABLE="claimable(address)(uint256)"
+SIG_RENT_CONTRIBUTE="contribute(uint256)"
+
+# === 全局变量 ===
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+FORCE=${FORCE:-0}
+
+# === 依赖检查 ===
+check_dependencies() {
+    command -v cast >/dev/null 2>&1 || { 
+        echo "❌ Error: 'cast' command not found. Please install Foundry."
+        echo "Visit: https://book.getfoundry.sh/getting-started/installation"
+        exit 1
+    }
+    
+    command -v jq >/dev/null 2>&1 || { 
+        echo "❌ Error: 'jq' command not found. Please install jq."
+        echo "On macOS: brew install jq"
+        echo "On Ubuntu: sudo apt-get install jq"
+        exit 1
+    }
+}
+
+# === 环境加载 ===
+load_env() {
+    local env_file="$PROJECT_ROOT/.env"
+    
+    if [[ ! -f "$env_file" ]]; then
+        echo "❌ Error: .env file not found at $env_file"
+        echo "Please run 'scripts/init-local.sh' first"
+        exit 1
+    fi
+    
+    set -a  # 自动导出变量
+    source "$env_file"
+    set +a
+    
+    # 设置默认值
+    RPC_URL=${RPC_URL:-http://localhost:8545}
+    NETWORK=${NETWORK:-mainnet-fork}
+    CHAIN_ID=${CHAIN_ID:-1}
+}
+
+# === 地址文件管理 ===
+load_addresses() {
+    local addr_file="$PROJECT_ROOT/addresses/${NETWORK}.json"
+    
+    if [[ ! -f "$addr_file" ]]; then
+        echo "❌ Error: Address file not found: $addr_file"
+        echo "Please run 'scripts/init-local.sh' first"
+        exit 1
+    fi
+    
+    # 读取合约地址
+    KYC_ORACLE_ADDR=$(jq -r '.KYCOracle // ""' "$addr_file")
+    PROPERTY_ORACLE_ADDR=$(jq -r '.PropertyOracle // ""' "$addr_file")
+    SERIES_FACTORY_ADDR=$(jq -r '.SeriesFactory // ""' "$addr_file")
+    RENT_TOKEN_IMPL_ADDR=$(jq -r '.RentTokenImpl // ""' "$addr_file")
+    SANCTION_ORACLE_ADDR=$(jq -r '.SanctionOracle // ""' "$addr_file")
+}
+
+# === 地址写入 ===
+save_address() {
+    local key="$1"
+    local address="$2"
+    local addr_file="$PROJECT_ROOT/addresses/${NETWORK}.json"
+    
+    # 使用 jq 更新 JSON 文件
+    local tmp_file=$(mktemp)
+    jq --arg key "$key" --arg addr "$address" '.[$key] = $addr' "$addr_file" > "$tmp_file"
+    mv "$tmp_file" "$addr_file"
+    
+    echo "✅ Address saved: $key = $address"
+}
+
+# === 链校验 ===
+verify_chain() {
+    if [[ -n "$CHAIN_ID" ]]; then
+        local current_chain_id
+        current_chain_id=$(cast chain-id --rpc-url "$RPC_URL" 2>/dev/null || echo "0")
+        
+        if [[ "$current_chain_id" != "$CHAIN_ID" ]]; then
+            echo "❌ Error: Chain ID mismatch!"
+            echo "Expected: $CHAIN_ID, Got: $current_chain_id"
+            echo "Please check your RPC_URL and CHAIN_ID configuration"
+            exit 1
+        fi
+    fi
+}
+
+# === 地址解析 ===
+resolve_address() {
+    local addr="$1"
+    
+    # 如果已经是地址格式，直接返回
+    if [[ "$addr" =~ ^0x[a-fA-F0-9]{40}$ ]]; then
+        echo "$addr"
+        return
+    fi
+    
+    # 尝试从环境变量解析角色 (转大写)
+    addr_upper=$(echo "$addr" | tr '[:lower:]' '[:upper:]')
+    case "$addr_upper" in
+        "ADMIN")
+            echo "${ADMIN_ADDRESS:-$(cast wallet address --private-key "${ADMIN_PRIVATE_KEY}")}"
+            ;;
+        "USER1")
+            echo "${USER1_ADDRESS:-$(cast wallet address --private-key "${USER1_PRIVATE_KEY}")}"
+            ;;
+        "USER2")
+            echo "${USER2_ADDRESS:-$(cast wallet address --private-key "${USER2_PRIVATE_KEY}")}"
+            ;;
+        "USER3")
+            echo "${USER3_ADDRESS:-$(cast wallet address --private-key "${USER3_PRIVATE_KEY}")}"
+            ;;
+        "USER4")
+            echo "${USER4_ADDRESS:-$(cast wallet address --private-key "${USER4_PRIVATE_KEY}")}"
+            ;;
+        *)
+            echo "$addr"  # 返回原值
+            ;;
+    esac
+}
+
+# === 私钥解析 ===
+resolve_private_key() {
+    local role="$1"
+    
+    role_upper=$(echo "$role" | tr '[:lower:]' '[:upper:]')
+    case "$role_upper" in
+        "ADMIN")
+            echo "$ADMIN_PRIVATE_KEY"
+            ;;
+        "USER1")
+            echo "$USER1_PRIVATE_KEY"
+            ;;
+        "USER2")
+            echo "$USER2_PRIVATE_KEY"
+            ;;
+        "USER3")
+            echo "$USER3_PRIVATE_KEY"
+            ;;
+        "USER4")
+            echo "$USER4_PRIVATE_KEY"
+            ;;
+        *)
+            # 如果是地址格式，尝试找对应的私钥
+            if [[ "$role" =~ ^0x[a-fA-F0-9]{40}$ ]]; then
+                local addr=$(resolve_address "ADMIN")
+                if [[ "$addr" == "$role" ]]; then
+                    echo "$ADMIN_PRIVATE_KEY"
+                    return
+                fi
+                
+                addr=$(resolve_address "USER1")
+                if [[ "$addr" == "$role" ]]; then
+                    echo "$USER1_PRIVATE_KEY"
+                    return
+                fi
+                
+                addr=$(resolve_address "USER2")
+                if [[ "$addr" == "$role" ]]; then
+                    echo "$USER2_PRIVATE_KEY"
+                    return
+                fi
+                
+                addr=$(resolve_address "USER3")
+                if [[ "$addr" == "$role" ]]; then
+                    echo "$USER3_PRIVATE_KEY"
+                    return
+                fi
+                
+                addr=$(resolve_address "USER4")
+                if [[ "$addr" == "$role" ]]; then
+                    echo "$USER4_PRIVATE_KEY"
+                    return
+                fi
+                
+                echo "❌ Error: No private key found for address $role" >&2
+                exit 1
+            else
+                echo "❌ Error: Unknown role or invalid address: $role" >&2
+                exit 1
+            fi
+            ;;
+    esac
+}
+
+# === 系列地址解析 ===
+resolve_series_address() {
+    local input="$1"
+    
+    # 如果已经是地址格式，直接返回
+    if [[ "$input" =~ ^0x[a-fA-F0-9]{40}$ ]]; then
+        echo "$input"
+        return
+    fi
+    
+    # 否则当作 propertyId 处理
+    local series_addr
+    series_addr=$(cast call --rpc-url "$RPC_URL" "$SERIES_FACTORY_ADDR" "$SIG_SERIES_ADDR_BY_ID" "$input" 2>/dev/null || echo "0x0000000000000000000000000000000000000000")
+    
+    if [[ "$series_addr" == "0x0000000000000000000000000000000000000000" ]]; then
+        echo "❌ Error: No series found for property ID $input" >&2
+        exit 1
+    fi
+    
+    echo "$series_addr"
+}
+
+# === 执行命令（支持 dry-run）===
+execute_command() {
+    local dry_run="$1"
+    shift
+    local cmd=("$@")
+    
+    if [[ "$dry_run" == "true" ]]; then
+        echo "🔍 Dry run - would execute:"
+        echo "${cmd[*]}"
+        return 0
+    else
+        echo "🚀 Executing: ${cmd[*]}"
+        "${cmd[@]}"
+    fi
+}
+
+# === 需要确认的写操作 ===
+require_confirmation() {
+    local dry_run="$1"
+    local yes_flag="$2"
+    
+    if [[ "$dry_run" == "true" ]]; then
+        return 0  # dry-run 模式无需确认
+    fi
+    
+    if [[ "$yes_flag" != "true" && "$FORCE" != "1" ]]; then
+        echo "❌ Error: This operation requires confirmation."
+        echo "Use --yes flag or set FORCE=1 environment variable"
+        exit 1
+    fi
+}
+
+# === 命令实现 ===
+
+# 账户/环境命令
+cmd_addr_show() {
+    local role="$1"
+    
+    if [[ -z "$role" ]]; then
+        echo "Usage: rwa addr:show <ROLE>"
+        echo "Roles: ADMIN, USER1, USER2, USER3, USER4"
+        exit 1
+    fi
+    
+    local addr
+    addr=$(resolve_address "$role")
+    echo "$addr"
+}
+
+cmd_block_time() {
+    cast block --rpc-url "$RPC_URL" latest --field timestamp
+}
+
+cmd_block_chainid() {
+    cast chain-id --rpc-url "$RPC_URL"
+}
+
+# KYC 命令
+cmd_kyc_check() {
+    local addr="$1"
+    addr=$(resolve_address "$addr")
+    
+    cast call --rpc-url "$RPC_URL" "$KYC_ORACLE_ADDR" "$SIG_KYC_CHECK" "$addr"
+}
+
+cmd_kyc_add() {
+    local addr="$1"
+    local dry_run="$2"
+    local yes_flag="$3"
+    
+    addr=$(resolve_address "$addr")
+    require_confirmation "$dry_run" "$yes_flag"
+    
+    local cmd=(cast send --rpc-url "$RPC_URL" --private-key "$ADMIN_PRIVATE_KEY" 
+               "$KYC_ORACLE_ADDR" "$SIG_KYC_ADD" "$addr")
+    
+    execute_command "$dry_run" "${cmd[@]}"
+}
+
+cmd_kyc_remove() {
+    local addr="$1"
+    local dry_run="$2"
+    local yes_flag="$3"
+    
+    addr=$(resolve_address "$addr")
+    require_confirmation "$dry_run" "$yes_flag"
+    
+    local cmd=(cast send --rpc-url "$RPC_URL" --private-key "$ADMIN_PRIVATE_KEY" 
+               "$KYC_ORACLE_ADDR" "$SIG_KYC_REMOVE" "$addr")
+    
+    execute_command "$dry_run" "${cmd[@]}"
+}
+
+# 房产命令
+cmd_property_add() {
+    local property_id=""
+    local payout=""
+    local valuation=""
+    local min=""
+    local max=""
+    local start=""
+    local end=""
+    local landlord=""
+    local doc_hash=""
+    local url=""
+    local dry_run="false"
+    local yes_flag="false"
+    
+    # 解析参数
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --id)
+                property_id="$2"
+                shift 2
+                ;;
+            --payout)
+                payout="$2"
+                shift 2
+                ;;
+            --valuation)
+                valuation="$2"
+                shift 2
+                ;;
+            --min)
+                min="$2"
+                shift 2
+                ;;
+            --max)
+                max="$2"
+                shift 2
+                ;;
+            --start)
+                if [[ "$2" =~ ^\+ ]]; then
+                    # 相对时间，如 +3600
+                    local offset="${2#+}"
+                    local current_time
+                    current_time=$(cast block --rpc-url "$RPC_URL" latest --field timestamp)
+                    start=$((current_time + offset))
+                else
+                    start="$2"
+                fi
+                shift 2
+                ;;
+            --end)
+                if [[ "$2" =~ ^\+ ]]; then
+                    # 相对时间，如 +157680000
+                    local offset="${2#+}"
+                    local current_time
+                    current_time=$(cast block --rpc-url "$RPC_URL" latest --field timestamp)
+                    end=$((current_time + offset))
+                else
+                    end="$2"
+                fi
+                shift 2
+                ;;
+            --landlord)
+                landlord="$2"
+                shift 2
+                ;;
+            --doc-hash)
+                doc_hash="$2"
+                shift 2
+                ;;
+            --url)
+                url="$2"
+                shift 2
+                ;;
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --yes)
+                yes_flag="true"
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    # 验证必需参数
+    if [[ -z "$property_id" || -z "$payout" || -z "$valuation" || -z "$min" || -z "$max" || -z "$start" || -z "$end" || -z "$landlord" || -z "$doc_hash" || -z "$url" ]]; then
+        echo "Usage: rwa property:add --id <id> --payout <token> --valuation <amount> --min <amount> --max <amount> --start <timestamp> --end <timestamp> --landlord <addr> --doc-hash <hash> --url <url> [--yes] [--dry-run]"
+        exit 1
+    fi
+    
+    # 解析地址
+    payout=$(resolve_address "$payout")
+    landlord=$(resolve_address "$landlord")
+    
+    require_confirmation "$dry_run" "$yes_flag"
+    
+    # 构造 PropertyData 结构体
+    local property_data="($property_id,$payout,$valuation,$min,$max,$start,$end,$landlord,$doc_hash,\"$url\")"
+    
+    local cmd=(cast send --rpc-url "$RPC_URL" --private-key "$ADMIN_PRIVATE_KEY" 
+               "$PROPERTY_ORACLE_ADDR" "$SIG_PROPERTY_ADD" "$property_id" "$property_data")
+    
+    execute_command "$dry_run" "${cmd[@]}"
+}
+
+# 系列命令
+cmd_series_create() {
+    local property_id="$1"
+    local name="$2"
+    local symbol="$3"
+    local dry_run="false"
+    local yes_flag="false"
+    
+    # 解析剩余参数
+    shift 3
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --yes)
+                yes_flag="true"
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [[ -z "$property_id" || -z "$name" || -z "$symbol" ]]; then
+        echo "Usage: rwa series:create <propertyId> <name> <symbol> [--yes] [--dry-run]"
+        exit 1
+    fi
+    
+    require_confirmation "$dry_run" "$yes_flag"
+    
+    local cmd=(cast send --rpc-url "$RPC_URL" --private-key "$ADMIN_PRIVATE_KEY" 
+               "$SERIES_FACTORY_ADDR" "$SIG_SERIES_CREATE" "$property_id" "$name" "$symbol")
+    
+    execute_command "$dry_run" "${cmd[@]}"
+}
+
+cmd_series_oracles_set() {
+    local property_id="$1"
+    local kyc_addr="$2"
+    local sanction_addr="$3"
+    local dry_run="false"
+    local yes_flag="false"
+    
+    # 解析剩余参数
+    shift 3
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --yes)
+                yes_flag="true"
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [[ -z "$property_id" || -z "$kyc_addr" || -z "$sanction_addr" ]]; then
+        echo "Usage: rwa series:oracles:set <propertyId> <kycAddr> <sanctionAddr> [--yes] [--dry-run]"
+        exit 1
+    fi
+    
+    kyc_addr=$(resolve_address "$kyc_addr")
+    sanction_addr=$(resolve_address "$sanction_addr")
+    
+    require_confirmation "$dry_run" "$yes_flag"
+    
+    local cmd=(cast send --rpc-url "$RPC_URL" --private-key "$ADMIN_PRIVATE_KEY" 
+               "$SERIES_FACTORY_ADDR" "$SIG_SERIES_SET_ORACLES" "$property_id" "$kyc_addr" "$sanction_addr")
+    
+    execute_command "$dry_run" "${cmd[@]}"
+}
+
+cmd_series_addr() {
+    local property_id="$1"
+    
+    if [[ -z "$property_id" ]]; then
+        echo "Usage: rwa series:addr <propertyId>"
+        exit 1
+    fi
+    
+    cast call --rpc-url "$RPC_URL" "$SERIES_FACTORY_ADDR" "$SIG_SERIES_ADDR_BY_ID" "$property_id"
+}
+
+cmd_series_info() {
+    local input="$1"
+    
+    if [[ -z "$input" ]]; then
+        echo "Usage: rwa series:info <seriesAddr|propertyId>"
+        exit 1
+    fi
+    
+    local series_addr
+    series_addr=$(resolve_series_address "$input")
+    
+    echo "📊 Series Information:"
+    echo "Contract Address: $series_addr"
+    
+    # 获取基本代币信息
+    local name symbol decimals total_supply
+    name=$(cast call --rpc-url "$RPC_URL" "$series_addr" "$SIG_ERC20_NAME" 2>/dev/null || echo "N/A")
+    symbol=$(cast call --rpc-url "$RPC_URL" "$series_addr" "$SIG_ERC20_SYMBOL" 2>/dev/null || echo "N/A")
+    decimals=$(cast call --rpc-url "$RPC_URL" "$series_addr" "$SIG_ERC20_DECIMALS" 2>/dev/null || echo "N/A")
+    total_supply=$(cast call --rpc-url "$RPC_URL" "$series_addr" "$SIG_ERC20_TOTAL_SUPPLY" 2>/dev/null || echo "N/A")
+    
+    echo "Name: $name"
+    echo "Symbol: $symbol"
+    echo "Decimals: $decimals"
+    echo "Total Supply: $total_supply"
+    
+    # 获取阶段信息
+    local phase
+    phase=$(cast call --rpc-url "$RPC_URL" "$series_addr" "$SIG_RENT_GET_PHASE" 2>/dev/null || echo "N/A")
+    local phase_name
+    case $phase in
+        0) phase_name="Fundraising" ;;
+        1) phase_name="AccrualStarted" ;;
+        2) phase_name="RaisingFailed" ;;
+        3) phase_name="AccrualFinished" ;;
+        4) phase_name="Terminated" ;;
+        *) phase_name="Unknown" ;;
+    esac
+    
+    echo "Phase: $phase ($phase_name)"
+}
+
+cmd_series_phase() {
+    local input="$1"
+    
+    if [[ -z "$input" ]]; then
+        echo "Usage: rwa series:phase <seriesAddr|propertyId>"
+        exit 1
+    fi
+    
+    local series_addr
+    series_addr=$(resolve_series_address "$input")
+    
+    cast call --rpc-url "$RPC_URL" "$series_addr" "$SIG_RENT_GET_PHASE"
+}
+
+cmd_series_contribute() {
+    local input="$1"
+    local amount="$2"
+    local from=""
+    local dry_run="false"
+    local yes_flag="false"
+    
+    # 解析剩余参数
+    shift 2
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --from)
+                from="$2"
+                shift 2
+                ;;
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --yes)
+                yes_flag="true"
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [[ -z "$input" || -z "$amount" ]]; then
+        echo "Usage: rwa series:contribute <seriesAddr|propertyId> <amount> [--from <role|addr>] [--yes] [--dry-run]"
+        exit 1
+    fi
+    
+    local series_addr
+    series_addr=$(resolve_series_address "$input")
+    
+    # 确定调用者
+    if [[ -z "$from" ]]; then
+        from="ADMIN"  # 默认使用 ADMIN
+    fi
+    
+    local private_key
+    private_key=$(resolve_private_key "$from")
+    
+    require_confirmation "$dry_run" "$yes_flag"
+    
+    local cmd=(cast send --rpc-url "$RPC_URL" --private-key "$private_key" 
+               "$series_addr" "$SIG_RENT_CONTRIBUTE" "$amount")
+    
+    execute_command "$dry_run" "${cmd[@]}"
+}
+
+cmd_series_transfer() {
+    local input="$1"
+    local to="$2"
+    local amount="$3"
+    local from=""
+    local dry_run="false"
+    local yes_flag="false"
+    
+    # 解析剩余参数
+    shift 3
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --from)
+                from="$2"
+                shift 2
+                ;;
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --yes)
+                yes_flag="true"
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [[ -z "$input" || -z "$to" || -z "$amount" ]]; then
+        echo "Usage: rwa series:transfer <seriesAddr|propertyId> <to> <amount> [--from <role|addr>] [--yes] [--dry-run]"
+        exit 1
+    fi
+    
+    local series_addr
+    series_addr=$(resolve_series_address "$input")
+    
+    to=$(resolve_address "$to")
+    
+    # 确定调用者
+    if [[ -z "$from" ]]; then
+        from="ADMIN"  # 默认使用 ADMIN
+    fi
+    
+    local private_key
+    private_key=$(resolve_private_key "$from")
+    
+    require_confirmation "$dry_run" "$yes_flag"
+    
+    local cmd=(cast send --rpc-url "$RPC_URL" --private-key "$private_key" 
+               "$series_addr" "$SIG_ERC20_TRANSFER" "$to" "$amount")
+    
+    execute_command "$dry_run" "${cmd[@]}"
+}
+
+cmd_series_claimable() {
+    local input="$1"
+    local addr="$2"
+    
+    if [[ -z "$input" || -z "$addr" ]]; then
+        echo "Usage: rwa series:claimable <seriesAddr|propertyId> <addr>"
+        exit 1
+    fi
+    
+    local series_addr
+    series_addr=$(resolve_series_address "$input")
+    
+    addr=$(resolve_address "$addr")
+    
+    cast call --rpc-url "$RPC_URL" "$series_addr" "$SIG_RENT_CLAIMABLE" "$addr"
+}
+
+# 工厂收益命令
+cmd_factory_profit_receive() {
+    local property_id="$1"
+    local amount="$2"
+    local dry_run="false"
+    local yes_flag="false"
+    
+    # 解析剩余参数
+    shift 2
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --yes)
+                yes_flag="true"
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [[ -z "$property_id" || -z "$amount" ]]; then
+        echo "Usage: rwa factory:profit:receive <propertyId> <amount> [--yes] [--dry-run]"
+        exit 1
+    fi
+    
+    require_confirmation "$dry_run" "$yes_flag"
+    
+    local cmd=(cast send --rpc-url "$RPC_URL" --private-key "$ADMIN_PRIVATE_KEY" 
+               "$SERIES_FACTORY_ADDR" "$SIG_FACTORY_RECEIVE_PROFIT" "$property_id" "$amount")
+    
+    execute_command "$dry_run" "${cmd[@]}"
+}
+
+# ERC20 通用命令
+cmd_erc20_approve() {
+    local token="$1"
+    local spender="$2"
+    local amount="$3"
+    local from=""
+    local dry_run="false"
+    local yes_flag="false"
+    
+    # 解析剩余参数
+    shift 3
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --from)
+                from="$2"
+                shift 2
+                ;;
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --yes)
+                yes_flag="true"
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [[ -z "$token" || -z "$spender" || -z "$amount" ]]; then
+        echo "Usage: rwa erc20:approve <token> <spender> <amount> [--from <role|addr>] [--yes] [--dry-run]"
+        exit 1
+    fi
+    
+    token=$(resolve_address "$token")
+    spender=$(resolve_address "$spender")
+    
+    # 确定调用者
+    if [[ -z "$from" ]]; then
+        from="ADMIN"  # 默认使用 ADMIN
+    fi
+    
+    local private_key
+    private_key=$(resolve_private_key "$from")
+    
+    require_confirmation "$dry_run" "$yes_flag"
+    
+    local cmd=(cast send --rpc-url "$RPC_URL" --private-key "$private_key" 
+               "$token" "$SIG_ERC20_APPROVE" "$spender" "$amount")
+    
+    execute_command "$dry_run" "${cmd[@]}"
+}
+
+cmd_erc20_balance() {
+    local token="$1"
+    local addr="$2"
+    
+    if [[ -z "$token" || -z "$addr" ]]; then
+        echo "Usage: rwa erc20:balance <token> <addr>"
+        exit 1
+    fi
+    
+    token=$(resolve_address "$token")
+    addr=$(resolve_address "$addr")
+    
+    cast call --rpc-url "$RPC_URL" "$token" "$SIG_ERC20_BALANCE_OF" "$addr"
+}
+
+# 本地测试辅助命令
+cmd_imp_start() {
+    local addr="$1"
+    
+    if [[ -z "$addr" ]]; then
+        echo "Usage: rwa imp:start <addr>"
+        exit 1
+    fi
+    
+    addr=$(resolve_address "$addr")
+    
+    cast rpc --rpc-url "$RPC_URL" anvil_impersonateAccount "$addr"
+    echo "✅ Started impersonating $addr"
+}
+
+cmd_imp_stop() {
+    local addr="$1"
+    
+    if [[ -z "$addr" ]]; then
+        echo "Usage: rwa imp:stop <addr>"
+        exit 1
+    fi
+    
+    addr=$(resolve_address "$addr")
+    
+    cast rpc --rpc-url "$RPC_URL" anvil_stopImpersonatingAccount "$addr"
+    echo "✅ Stopped impersonating $addr"
+}
+
+cmd_time_increase() {
+    local seconds="$1"
+    
+    if [[ -z "$seconds" ]]; then
+        echo "Usage: rwa time:increase <seconds>"
+        exit 1
+    fi
+    
+    cast rpc --rpc-url "$RPC_URL" evm_increaseTime "$seconds"
+    echo "✅ Time increased by $seconds seconds"
+}
+
+cmd_mine() {
+    cast rpc --rpc-url "$RPC_URL" evm_mine
+    echo "✅ New block mined"
+}
+
+# === 帮助信息 ===
+show_help() {
+    cat << EOF
+RWA CLI Tool - Real World Asset management CLI
+
+Usage: rwa <command> [options]
+
+账户/环境:
+  addr:show <ROLE>              显示角色地址
+  block:time                    显示当前区块时间
+  block:chainid                 显示当前链ID
+
+KYC 管理:
+  kyc:check <addr>              检查 KYC 状态
+  kyc:add <addr> [--yes] [--dry-run]    添加到 KYC 白名单
+  kyc:remove <addr> [--yes] [--dry-run] 从 KYC 白名单移除
+
+房产管理:
+  property:add --id <id> --payout <token> --valuation <amount> 
+               --min <amount> --max <amount> --start <timestamp> 
+               --end <timestamp> --landlord <addr> --doc-hash <hash> 
+               --url <url> [--yes] [--dry-run]
+                                添加或更新房产
+
+系列管理:
+  series:create <propertyId> <name> <symbol> [--yes] [--dry-run]
+                                创建 RentToken 系列
+  series:oracles:set <propertyId> <kycAddr> <sanctionAddr> [--yes] [--dry-run]
+                                设置系列 Oracle
+  series:addr <propertyId>      查询系列合约地址
+  series:info <seriesAddr|propertyId>   显示系列信息
+  series:phase <seriesAddr|propertyId>  显示系列阶段
+  series:contribute <seriesAddr|propertyId> <amount> [--from <role|addr>] [--yes] [--dry-run]
+                                向系列贡献资金
+  series:transfer <seriesAddr|propertyId> <to> <amount> [--from <role|addr>] [--yes] [--dry-run]
+                                转移系列代币
+  series:claimable <seriesAddr|propertyId> <addr>   查询可提取收益
+
+工厂收益:
+  factory:profit:receive <propertyId> <amount> [--yes] [--dry-run]
+                                分发收益
+
+ERC20 通用:
+  erc20:approve <token> <spender> <amount> [--from <role|addr>] [--yes] [--dry-run]
+                                授权代币
+  erc20:balance <token> <addr>  查询代币余额
+
+本地测试:
+  imp:start <addr>              开始模拟地址
+  imp:stop <addr>               停止模拟地址
+  time:increase <seconds>       增加区块时间
+  mine                          挖掘新区块
+
+全局选项:
+  --dry-run                     仅显示将执行的命令，不实际执行
+  --yes                         跳过确认，直接执行写操作
+  --from <role|addr>            指定调用者（用于需要私钥的操作）
+
+环境变量:
+  FORCE=1                       等同于 --yes
+  
+角色名称: ADMIN, USER1, USER2, USER3, USER4
+
+更多信息请查看: docs/CLI.md
+EOF
+}
+
+# === 主命令分发 ===
+main() {
+    # 检查依赖
+    check_dependencies
+    
+    # 如果没有参数，显示帮助
+    if [[ $# -eq 0 ]]; then
+        show_help
+        exit 0
+    fi
+    
+    # 解析命令
+    local command="$1"
+    shift
+    
+    # 加载配置（除了帮助命令外都需要）
+    if [[ "$command" != "help" && "$command" != "--help" && "$command" != "-h" ]]; then
+        load_env
+        load_addresses
+        verify_chain
+    fi
+    
+    # 分发命令
+    case "$command" in
+        # 账户/环境
+        "addr:show")
+            cmd_addr_show "$@"
+            ;;
+        "block:time")
+            cmd_block_time
+            ;;
+        "block:chainid")
+            cmd_block_chainid
+            ;;
+        
+        # KYC
+        "kyc:check")
+            cmd_kyc_check "$@"
+            ;;
+        "kyc:add")
+            local addr="$1"
+            local dry_run="false"
+            local yes_flag="false"
+            
+            shift
+            while [[ $# -gt 0 ]]; do
+                case $1 in
+                    --dry-run)
+                        dry_run="true"
+                        shift
+                        ;;
+                    --yes)
+                        yes_flag="true"
+                        shift
+                        ;;
+                    *)
+                        echo "Unknown option: $1"
+                        exit 1
+                        ;;
+                esac
+            done
+            
+            cmd_kyc_add "$addr" "$dry_run" "$yes_flag"
+            ;;
+        "kyc:remove")
+            local addr="$1"
+            local dry_run="false"
+            local yes_flag="false"
+            
+            shift
+            while [[ $# -gt 0 ]]; do
+                case $1 in
+                    --dry-run)
+                        dry_run="true"
+                        shift
+                        ;;
+                    --yes)
+                        yes_flag="true"
+                        shift
+                        ;;
+                    *)
+                        echo "Unknown option: $1"
+                        exit 1
+                        ;;
+                esac
+            done
+            
+            cmd_kyc_remove "$addr" "$dry_run" "$yes_flag"
+            ;;
+        
+        # 房产
+        "property:add")
+            cmd_property_add "$@"
+            ;;
+        
+        # 系列
+        "series:create")
+            cmd_series_create "$@"
+            ;;
+        "series:oracles:set")
+            cmd_series_oracles_set "$@"
+            ;;
+        "series:addr")
+            cmd_series_addr "$@"
+            ;;
+        "series:info")
+            cmd_series_info "$@"
+            ;;
+        "series:phase")
+            cmd_series_phase "$@"
+            ;;
+        "series:contribute")
+            cmd_series_contribute "$@"
+            ;;
+        "series:transfer")
+            cmd_series_transfer "$@"
+            ;;
+        "series:claimable")
+            cmd_series_claimable "$@"
+            ;;
+        
+        # 工厂收益
+        "factory:profit:receive")
+            cmd_factory_profit_receive "$@"
+            ;;
+        
+        # ERC20
+        "erc20:approve")
+            cmd_erc20_approve "$@"
+            ;;
+        "erc20:balance")
+            cmd_erc20_balance "$@"
+            ;;
+        
+        # 本地测试
+        "imp:start")
+            cmd_imp_start "$@"
+            ;;
+        "imp:stop")
+            cmd_imp_stop "$@"
+            ;;
+        "time:increase")
+            cmd_time_increase "$@"
+            ;;
+        "mine")
+            cmd_mine
+            ;;
+        
+        # 帮助
+        "help"|"--help"|"-h")
+            show_help
+            ;;
+        
+        *)
+            echo "❌ Unknown command: $command"
+            echo "Use 'rwa help' to see available commands"
+            exit 1
+            ;;
+    esac
+}
+
+# 执行主函数
+main "$@"
