@@ -123,6 +123,20 @@ contract SeriesFactory is AccessControl, Pausable, ReentrancyGuard {
     }
 
     /**
+     * @dev Start a series by calling setStartTime() on the corresponding RTN contract
+     * @param propertyId The property ID
+     * @notice Only callable by operator/admin, sets accrualStart to current time + 1 second
+     */
+    function startSeriesNow(uint256 propertyId) external onlyOperator whenNotPaused {
+        address seriesAddress = propertyIdToSeries[propertyId];
+        require(seriesAddress != address(0), "SeriesFactory: Series not found");
+
+        // Call setStartTime() on the series contract
+        // SeriesFactory is the owner of each series contract, so this call will succeed
+        RentToken(seriesAddress).setStartTime();
+    }
+
+    /**
      * @dev Get payout token for a property
      * @param propertyId The property ID
      * @return The payout token address

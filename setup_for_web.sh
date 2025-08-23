@@ -12,7 +12,7 @@
 #     "valuation": 72000,
 #     "minRaising": 20000,
 #     "maxRaising": 20000,
-#     "accrualStart": 1755856800,
+#     "accrualStart": 1756051200,
 #     "accrualEnd": 1841392800,
 #     "landlord": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
 #     "docHash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
@@ -24,7 +24,7 @@
 #     "valuation": 180000,
 #     "minRaising": 50000,
 #     "maxRaising": 100000,
-#     "accrualStart": 1755856800,
+#     "accrualStart": 1756051200,
 #     "accrualEnd": 1841392800,
 #     "landlord": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
 #     "docHash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
@@ -36,7 +36,7 @@
 #     "valuation": 19200,
 #     "minRaising": 19200,
 #     "maxRaising": 19200,
-#     "accrualStart": 1755856800,
+#     "accrualStart": 1756051200,
 #     "accrualEnd": 1841392800,
 #     "landlord": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
 #     "docHash": "0x567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234",
@@ -139,7 +139,7 @@ PROPERTY3_MIN_RAISING=$((19200 * 1000000))  # 19200 USDC minimum (unchanged)
 PROPERTY3_MAX_RAISING=$((19200 * 1000000))  # 19200 USDC maximum (unchanged)
 
 # 使用固定的时间戳（从注释中获取）
-ACCRUAL_START=1755856800
+ACCRUAL_START=1756051200
 ACCRUAL_END=1841392800
 
 echo "⏰ 时间配置:"
@@ -592,8 +592,8 @@ echo "   状态: $(if [ $PROPERTY3_RAISED_CLEAN -ge $PROPERTY3_MIN_RAISING_CLEAN
 echo "   状态: $(if [ $PROPERTY3_RAISED_CLEAN -ge $PROPERTY3_MAX_RAISING_CLEAN ]; then echo "✅ 达到最大目标"; else echo "❌ 未达到最大目标"; fi)"
 echo ""
 
-# 步骤8: 管理员将房产1设置为开始状态
-echo "🚀 步骤8: 管理员设置房产1开始收益阶段..."
+# 步骤8: 管理员通过SeriesFactory开始房产1的收益阶段
+echo "🚀 步骤8: 管理员通过SeriesFactory开始房产1的收益阶段..."
 
 # 检查房产1是否达到最小募集目标
 if [ $PROPERTY1_RAISED_CLEAN -ge $PROPERTY1_MIN_RAISING_CLEAN ]; then
@@ -602,31 +602,23 @@ if [ $PROPERTY1_RAISED_CLEAN -ge $PROPERTY1_MIN_RAISING_CLEAN ]; then
 
     # 检查是否还在募资阶段
     if [ $PROPERTY1_PHASE -eq 0 ]; then
-        echo "   房产1处于募资阶段，正在开始收益阶段..."
+        echo "   房产1处于募资阶段，正在通过SeriesFactory开始收益阶段..."
 
-        # 调用setStartTime()函数，需要先检查合约的owner
-        PROPERTY1_OWNER=$(cast call --rpc-url $RPC_URL $SERIES1_ADDR "owner()(address)")
-        echo "   房产1合约所有者: $PROPERTY1_OWNER"
+        # 通过SeriesFactory调用startSeriesNow方法
+        echo "   正在调用SeriesFactory.startSeriesNow()..."
+        cast send --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY \
+            $SERIES_FACTORY_ADDR "startSeriesNow(uint256)" $PROPERTY1_ID \
+            || { echo "❌ 通过SeriesFactory开始房产1失败"; exit 1; }
 
-        if [ "$PROPERTY1_OWNER" = "$ADMIN_ADDRESS" ]; then
-            echo "   管理员是所有者，正在调用setStartTime()..."
-            cast send --rpc-url $RPC_URL --private-key $ADMIN_PRIVATE_KEY \
-                $SERIES1_ADDR "setStartTime()" \
-                || { echo "❌ 设置房产1开始时间失败"; exit 1; }
+        echo "✅ 房产1开始时间设置成功"
 
-            echo "✅ 房产1开始时间设置成功"
+        # 验证状态变化
+        NEW_PHASE=$(cast call --rpc-url $RPC_URL $SERIES1_ADDR "getPhase()(uint8)")
+        NEW_ACCRUAL_START=$(cast call --rpc-url $RPC_URL $SERIES1_ADDR "accrualStart()(uint64)")
 
-            # 验证状态变化
-            NEW_PHASE=$(cast call --rpc-url $RPC_URL $SERIES1_ADDR "getPhase()(uint8)")
-            NEW_ACCRUAL_START=$(cast call --rpc-url $RPC_URL $SERIES1_ADDR "accrualStart()(uint64)")
+        echo "   新阶段: $NEW_PHASE"
+        echo "   新收益开始时间: $NEW_ACCRUAL_START ($(date -r $NEW_ACCRUAL_START))"
 
-            echo "   新阶段: $NEW_PHASE"
-            echo "   新收益开始时间: $NEW_ACCRUAL_START ($(date -r $NEW_ACCRUAL_START))"
-
-        else
-            echo "   ⚠️  管理员不是房产1合约的所有者"
-            echo "   无法设置开始时间。所有者是: $PROPERTY1_OWNER"
-        fi
     else
         echo "   房产1不处于募资阶段 (当前阶段: $PROPERTY1_PHASE)"
         echo "   无法设置开始时间"
