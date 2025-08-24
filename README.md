@@ -53,7 +53,10 @@ rentoken-contracts/
 │   ├── json0755/         # 核心合约测试
 │   ├── e2e_test_cases/   # 端到端测试用例
 │   └── KycPool.t.sol     # 流动性池测试
+├── lib/                   # 外部依赖库
 ├── dev_scripts/          # 开发和部署脚本
+├── foundry.toml          # Foundry 配置文件
+└── .env.example          # 环境变量示例
 ```
 
 ## 快速开始
@@ -91,10 +94,14 @@ forge test
 
 ```bash
 # 启动本地节点
-anvil --fork <RPC>
+anvil
 
-# 部署到本地网络
+# 在另一个终端中部署到本地网络
+forge script dev_scripts/init-local.sh --rpc-url http://localhost:8545 --broadcast
 
+# 或者使用环境变量文件
+source dev_scripts/anvil.env
+forge script dev_scripts/init-local.sh --rpc-url $RPC_URL --broadcast
 ```
 
 ## 测试
@@ -134,10 +141,10 @@ forge coverage
 
 ```bash
 # 部署到测试网
-forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast --verify
+forge script dev_scripts/init-sepolia.sh --rpc-url $RPC_URL --broadcast --verify
 
-# 部署到主网
-forge script script/Deploy.s.sol --rpc-url $MAINNET_RPC --broadcast --verify
+# 部署到主网（需要相应的部署脚本）
+# forge script dev_scripts/init-mainnet.sh --rpc-url $MAINNET_RPC --broadcast --verify
 ```
 
 ## 开发指南
@@ -165,10 +172,10 @@ forge script script/Deploy.s.sol --rpc-url $MAINNET_RPC --broadcast --verify
 
 ## 文档
 
-- **[技术白皮书](rentoken_whitepaper.md)**: 详细的技术架构和业务逻辑说明
 - **[项目规范](.cursorrules)**: 开发规范和最佳实践
 - **[测试用例文档](test/e2e_test_cases/test_cases_documentation.md)**: 端到端测
   试用例说明
+- **[开发脚本](dev_scripts/)**: 各种环境的部署和初始化脚本
 
 ## 贡献指南
 
@@ -196,7 +203,7 @@ forge script script/Deploy.s.sol --rpc-url $MAINNET_RPC --broadcast --verify
 
 ## 联系我们
 
-- 项目主页: [https://github.com/rentoken-world/]
+- 项目主页: [https://github.com/rentoken-world/rentoken-contracts]
 - 问题反馈: [https://github.com/rentoken-world/rentoken-contracts/issues]
 
 ## 免责声明
