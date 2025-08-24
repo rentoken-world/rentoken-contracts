@@ -147,9 +147,12 @@ read_latest_property() {
     PROPERTY_NAME=$(echo "$PROPERTY_NAME" | xargs)
     PROPERTY_DESC=$(echo "$PROPERTY_DESC" | xargs)
     PROPERTY_LOCATION=$(echo "$PROPERTY_LOCATION" | xargs)
-    PROPERTY_VALUATION=$(echo "$PROPERTY_VALUATION" | xargs)
-    PROPERTY_MIN_RAISING=$(echo "$PROPERTY_MIN_RAISING" | xargs)
-    PROPERTY_MAX_RAISING=$(echo "$PROPERTY_MAX_RAISING" | xargs)
+    # PROPERTY_VALUATION=$(echo "$PROPERTY_VALUATION" | xargs)
+    PROPERTY_VALUATION=50000 # fix value
+    # PROPERTY_MIN_RAISING=$(echo "$PROPERTY_MIN_RAISING" | xargs)
+    PROPERTY_MIN_RAISING=20000 # fix value
+    # PROPERTY_MAX_RAISING=$(echo "$PROPERTY_MAX_RAISING" | xargs)
+    PROPERTY_MAX_RAISING=40000 # fix value
     LANDLORD_ADDRESS=$(echo "$LANDLORD_ADDRESS" | xargs)
     PROPERTY_DOC_HASH=$(echo "$PROPERTY_DOC_HASH" | xargs)
     PROPERTY_OFFCHAIN_URL=$(echo "$PROPERTY_OFFCHAIN_URL" | xargs)
@@ -182,6 +185,17 @@ add_property_to_oracle() {
     # 检查房产是否已存在
     local exists=$(cast call --rpc-url "$RPC_URL" "$PROPERTY_ORACLE_ADDR" "propertyExists(uint256)(bool)" "$PROPERTY_ID")
 
+        # 计算时间戳
+    current_time=$(cast block --rpc-url "$RPC_URL" latest --field timestamp)
+    # local accrual_start=$((current_time + 3600))  # 1小时后开始
+    accrual_start=1756137600 # 2025-08-26 00:00:00 UTC
+    accrual_end=$((accrual_start + 31536000))  # 1年后结束
+
+    # 转换金额为wei (假设6位小数)
+    valuation_wei=$((PROPERTY_VALUATION * 1000000))
+    min_raising_wei=$((PROPERTY_MIN_RAISING * 1000000))
+    max_raising_wei=$((PROPERTY_MAX_RAISING * 1000000))
+
     if [ "$exists" = "true" ]; then
         log_warning "房产 $PROPERTY_ID 已存在于PropertyOracle"
         return 0
@@ -189,15 +203,7 @@ add_property_to_oracle() {
 
     log_info "添加房产 $PROPERTY_ID 到PropertyOracle..."
 
-    # 计算时间戳
-    local current_time=$(cast block --rpc-url "$RPC_URL" latest --field timestamp)
-    local accrual_start=$((current_time + 3600))  # 1小时后开始
-    local accrual_end=$((accrual_start + 31536000))  # 1年后结束
 
-    # 转换金额为wei (假设6位小数)
-    local valuation_wei=$((PROPERTY_VALUATION * 1000000))
-    local min_raising_wei=$((PROPERTY_MIN_RAISING * 1000000))
-    local max_raising_wei=$((PROPERTY_MAX_RAISING * 1000000))
 
     # 调试输出
     log_info "调试信息:"
@@ -279,8 +285,10 @@ update_database_status() {
     local CURRENT_PHASE=$(cast call --rpc-url "$RPC_URL" "$SERIES_ADDR" "getPhase()(uint8)")
     log_info "当前阶段: $CURRENT_PHASE"
 
+
+
     # 更新owner字段为系列合约地址，status字段为funding
-    local update_query="UPDATE properties SET \"renTokenAddress\" = '$SERIES_ADDR', \"status\" = '$CURRENT_PHASE', \"updatedAt\" = NOW() WHERE id = '$PROPERTY_ID';"
+    local update_query="UPDATE properties SET \"renTokenAddress\" = '$SERIES_ADDR', \"status\" = '$CURRENT_PHASE', \"minRaising\" = $PROPERTY_MIN_RAISING, \"maxRaising\" = $PROPERTY_MAX_RAISING, \"accrualStart\" = $accrual_start, \"accrualEnd\" = $accrual_end, \"updatedAt\" = NOW() WHERE id = '$PROPERTY_ID';"
     echo $update_query
 
     psql "$DATABASE_URL" -c "$update_query" || { log_error "更新数据库失败"; exit 1; }

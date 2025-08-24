@@ -41,22 +41,22 @@ Token，房租定期打入合约，持有人可以随时提取利润。
 
 ```
 rentoken-contracts/
-├── src/                    # 智能合约源码
+├── src/                   # 智能合约源码
 │   ├── ammpool/           # AMM 流动性池相关合约
 │   ├── interfaces/        # 合约接口定义
-│   ├── mocks/            # 测试用模拟合约
+│   ├── mocks/             # 测试用模拟合约
 │   ├── SeriesFactory.sol  # 系列工厂合约
 │   ├── RentToken.sol      # 租金代币合约
 │   ├── PropertyOracle.sol # 房产信息 Oracle
 │   └── KYCOracle.sol      # KYC 管理合约
 ├── test/                  # 测试文件
-│   ├── json0755/         # 核心合约测试
-│   ├── e2e_test_cases/   # 端到端测试用例
-│   └── KycPool.t.sol     # 流动性池测试
+│   ├── json0755/          # 核心合约测试
+│   ├── e2e_test_cases/    # 端到端测试用例
+│   └── KycPool.t.sol      # 流动性池测试
 ├── lib/                   # 外部依赖库
-├── dev_scripts/          # 开发和部署脚本
-├── foundry.toml          # Foundry 配置文件
-└── .env.example          # 环境变量示例
+├── dev_scripts/           # 开发和部署脚本
+├── foundry.toml           # Foundry 配置文件
+└── .env.example           # 环境变量示例
 ```
 
 ## 快速开始
