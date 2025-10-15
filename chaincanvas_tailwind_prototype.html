@@ -1,0 +1,265 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChainCanvas — Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* small custom styles */
+    .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(6px); }
+  </style>
+</head>
+<body class="bg-amber-50 text-slate-900 antialiased">
+  <header class="max-w-6xl mx-auto p-6 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="text-2xl font-serif">ChainCanvas</div>
+      <nav class="hidden md:flex gap-4 text-sm">
+        <a href="#home" class="hover:underline">Home</a>
+        <a href="#projects" class="hover:underline">Projects</a>
+        <a href="#submit" class="hover:underline">Submit</a>
+        <a href="#admin" class="hover:underline">Admin</a>
+      </nav>
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="connectBtn" class="px-4 py-2 rounded-md bg-amber-700 text-white text-sm">Connect Wallet</button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto p-6 space-y-10">
+    <!-- Hero -->
+    <section id="home" class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+      <div>
+        <h1 class="text-4xl md:text-5xl font-serif leading-tight mb-4">A collaborative NFT platform to track creative evolution</h1>
+        <p class="text-slate-700 mb-6">Record every step from idea text to final render — chain-verified, provenance-rich, and community-driven.</p>
+        <div class="flex gap-3">
+          <a href="#submit" class="px-5 py-3 bg-amber-700 text-white rounded-md shadow">Create New Project</a>
+          <a href="#projects" class="px-5 py-3 border rounded-md">Browse Projects</a>
+        </div>
+      </div>
+      <div class="rounded-2xl overflow-hidden shadow-lg">
+        <img src="sandbox:/mnt/data/A_user_interface_design_mockup_for_ChainCanvas,_an.png" alt="ChainCanvas mockup" class="w-full h-72 object-cover">
+      </div>
+    </section>
+
+    <!-- Projects Grid -->
+    <section id="projects">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-semibold">Featured Projects</h2>
+        <div class="text-sm text-slate-600">Sorted by latest activity</div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Card 1 -->
+        <article class="bg-white rounded-2xl shadow p-4">
+          <img src="https://picsum.photos/seed/starbeast/600/360" class="rounded-xl w-full h-40 object-cover mb-4" alt="">
+          <h3 class="text-lg font-semibold">Starbeast</h3>
+          <p class="text-sm text-slate-600 mt-1">Idea → Draft → Line → 3D</p>
+          <div class="mt-4 flex justify-between items-center">
+            <div class="text-sm text-amber-700 font-medium">Idea</div>
+            <button class="openProjectBtn px-3 py-1 rounded-md border text-sm">View</button>
+          </div>
+        </article>
+
+        <!-- Card 2 -->
+        <article class="bg-white rounded-2xl shadow p-4">
+          <img src="https://picsum.photos/seed/strickee/600/360" class="rounded-xl w-full h-40 object-cover mb-4" alt="">
+          <h3 class="text-lg font-semibold">Strickee</h3>
+          <p class="text-sm text-slate-600 mt-1">Collaborative character IP</p>
+          <div class="mt-4 flex justify-between items-center">
+            <div class="text-sm text-amber-700 font-medium">Draft</div>
+            <button class="openProjectBtn px-3 py-1 rounded-md border text-sm">View</button>
+          </div>
+        </article>
+
+        <!-- Card 3 -->
+        <article class="bg-white rounded-2xl shadow p-4">
+          <img src="https://picsum.photos/seed/aurora/600/360" class="rounded-xl w-full h-40 object-cover mb-4" alt="">
+          <h3 class="text-lg font-semibold">Aurora Fox</h3>
+          <p class="text-sm text-slate-600 mt-1">Visual evolution study</p>
+          <div class="mt-4 flex justify-between items-center">
+            <div class="text-sm text-amber-700 font-medium">3D</div>
+            <button class="openProjectBtn px-3 py-1 rounded-md border text-sm">View</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Project Detail Modal / Section -->
+    <section id="projectDetail" class="hidden">
+      <div class="bg-white rounded-2xl shadow p-6 grid md:grid-cols-3 gap-6">
+        <div class="md:col-span-2 space-y-4">
+          <img id="detailImage" src="https://picsum.photos/seed/starbeast/900/500" class="rounded-xl w-full h-96 object-cover" alt="">
+          <div class="flex gap-4 items-center">
+            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+              <div id="progressBar" class="bg-amber-600 h-2 w-20"></div>
+            </div>
+            <div class="text-sm text-slate-600">Stage: <span id="detailStage" class="font-medium">Idea</span></div>
+          </div>
+
+          <div class="prose max-w-none">
+            <h3 id="detailTitle">Starbeast</h3>
+            <p id="detailDesc">A mythical creature from the stars, with a glowing mane and a majestic presence. This project documents the full creative evolution from idea text to final render.</p>
+          </div>
+        </div>
+
+        <aside class="space-y-4">
+          <div class="bg-amber-50 border rounded-lg p-4">
+            <div class="text-sm text-slate-600">Contributors</div>
+            <ul id="contributors" class="mt-2 text-sm space-y-2">
+              <li>Artist • 0xAb...34</li>
+              <li>Modeler • 0xF9...b7</li>
+            </ul>
+          </div>
+
+          <div class="bg-white border rounded-lg p-4">
+            <div class="flex justify-between items-center">
+              <div class="text-sm text-slate-600">Versions</div>
+              <div class="text-xs text-slate-500">v4</div>
+            </div>
+            <ol class="mt-3 space-y-3 text-sm">
+              <li class="flex justify-between"><span>v0 — Idea</span><span class="text-slate-500">Jan 01</span></li>
+              <li class="flex justify-between"><span>v1 — Draft</span><span class="text-slate-500">Jan 12</span></li>
+              <li class="flex justify-between"><span>v2 — Line</span><span class="text-slate-500">Feb 03</span></li>
+              <li class="flex justify-between"><span>v3 — 3D</span><span class="text-slate-500">Mar 15</span></li>
+            </ol>
+          </div>
+
+          <div class="flex gap-2">
+            <button id="openSubmit" class="flex-1 px-4 py-2 rounded-md bg-amber-700 text-white">Submit Version</button>
+            <button id="closeDetail" class="flex-1 px-4 py-2 rounded-md border">Close</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Submit Section -->
+    <section id="submit" class="bg-white rounded-2xl shadow p-6">
+      <h2 class="text-xl font-semibold mb-4">Submit a New Version</h2>
+      <form id="submitForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="md:col-span-2 space-y-3">
+          <label class="block text-sm text-slate-600">Project</label>
+          <select id="projectSelect" class="w-full border rounded-md p-3">
+            <option value="starbeast">Starbeast</option>
+            <option value="strickee">Strickee</option>
+            <option value="aurora">Aurora Fox</option>
+          </select>
+
+          <label class="block text-sm text-slate-600">Upload Asset</label>
+          <input id="fileInput" type="file" class="w-full text-sm" />
+
+          <label class="block text-sm text-slate-600">Description</label>
+          <textarea id="desc" rows="4" class="w-full border rounded-md p-3" placeholder="Describe changes..."></textarea>
+        </div>
+
+        <div class="space-y-3 p-4 border rounded-md">
+          <label class="block text-sm text-slate-600">Stage</label>
+          <select id="stageSelect" class="w-full border rounded-md p-3">
+            <option value="idea">Idea</option>
+            <option value="draft">Draft</option>
+            <option value="line">Line</option>
+            <option value="ortho">Orthographic</option>
+            <option value="3d">3D</option>
+            <option value="render">Render</option>
+          </select>
+
+          <div>
+            <label class="text-sm text-slate-600">Preview</label>
+            <div id="previewBox" class="mt-2 rounded-md bg-slate-50 h-40 flex items-center justify-center text-slate-400">No file</div>
+          </div>
+
+          <button type="submit" class="w-full px-4 py-2 rounded-md bg-amber-700 text-white">Upload & Submit</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Admin Panel -->
+    <section id="admin" class="bg-white rounded-2xl shadow p-6">
+      <h2 class="text-xl font-semibold mb-4">Admin — Approve Versions</h2>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between border rounded-md p-4">
+          <div>
+            <div class="font-medium">Starbeast — v3</div>
+            <div class="text-sm text-slate-600">Submitted by 0xAb...34 • Mar 15</div>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-3 py-1 rounded-md border approveBtn">Approve</button>
+            <button class="px-3 py-1 rounded-md bg-amber-700 text-white mergeBtn">Merge</button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between border rounded-md p-4">
+          <div>
+            <div class="font-medium">Strickee — v1</div>
+            <div class="text-sm text-slate-600">Submitted by 0xF9...b7 • Feb 03</div>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-3 py-1 rounded-md border approveBtn">Approve</button>
+            <button class="px-3 py-1 rounded-md bg-amber-700 text-white mergeBtn">Merge</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="text-center text-sm text-slate-500 py-10">ChainCanvas Prototype — Tailwind demo · Not connected to blockchain</footer>
+  </main>
+
+  <script>
+    // Simple interactivity for prototype
+    document.querySelectorAll('.openProjectBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=> {
+        document.getElementById('projectDetail').classList.remove('hidden');
+        window.scrollTo({top:0, behavior:'smooth'});
+      });
+    });
+    document.getElementById('closeDetail').addEventListener('click', ()=> {
+      document.getElementById('projectDetail').classList.add('hidden');
+    });
+    document.getElementById('openSubmit').addEventListener('click', ()=> {
+      location.href = '#submit';
+    });
+
+    // Submit preview
+    const fileInput = document.getElementById('fileInput');
+    const previewBox = document.getElementById('previewBox');
+    fileInput.addEventListener('change', (e)=>{
+      const f = e.target.files[0];
+      if(!f) { previewBox.textContent='No file'; return; }
+      const url = URL.createObjectURL(f);
+      previewBox.innerHTML = '<img src=\"'+url+'\" class=\"w-full h-full object-contain rounded-md\">';
+    });
+
+    // Admin buttons (visual only)
+    document.querySelectorAll('.approveBtn').forEach(b=>{
+      b.addEventListener('click', ()=> {
+        b.textContent = 'Approved';
+        b.classList.add('bg-emerald-100');
+      });
+    });
+    document.querySelectorAll('.mergeBtn').forEach(b=>{
+      b.addEventListener('click', ()=> {
+        b.textContent = 'Merged';
+        b.classList.add('bg-amber-800', 'text-white');
+      });
+    });
+
+    // Wallet connect simulation
+    const connectBtn = document.getElementById('connectBtn');
+    connectBtn.addEventListener('click', ()=>{
+      if(connectBtn.dataset.connected === '1') {
+        connectBtn.textContent = 'Connect Wallet';
+        connectBtn.dataset.connected = '0';
+      } else {
+        connectBtn.textContent = '0xAb...34';
+        connectBtn.dataset.connected = '1';
+      }
+    });
+
+    // Submit form demo behavior
+    document.getElementById('submitForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      alert('This is a UI prototype. To connect to Solana and submit on-chain, integrate web3.storage and Anchor client.');
+    });
+  </script>
+</body>
+</html>
